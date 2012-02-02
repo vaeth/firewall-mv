@@ -1,0 +1,28 @@
+(C) Martin Väth <martin@mvath.de>
+This project is under the BSD license.
+
+A collection of POSIX shell scripts to initialize iptables and
+net-related sysctl variables of Linux.
+
+These POSIX scripts set some typical iptables commands for a dialup PC,
+optionally including a simple portknocking solution and router functionality.
+The usage is somewhat similar to SuSEfirewall2, but the approach has
+some essential differences. In particular, packets are usually not DROPed but
+REJECTed until a rate-limit is reached. It is not necessary to restart the
+firewall after a connection is established. The setting of the kernel variables
+is done with a separate script. Currently, IPv6 is not supported by the script.
+
+To install this project, copy the scripts into your path.
+firewall.config can also be copied into your /etc directory.
+
+Before you run firewall, please edit firewall.config to your needs.
+
+The firewall script reads your firewall.config and then
+(by default) runs sysctl.net and initializes iptables according
+to the content of firewall.config.
+
+sysctl.net initializes some net-related Linux sysctl variables.
+
+To get help, run firewall -h or sysctl.net -h, respectively.
+
+For Gentoo, there is an ebuild in the mv overlay (available by layman).

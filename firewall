@@ -1,0 +1,871 @@
+#! /bin/sh
+# This script is part of Martin Vaeth's firewall scripts.
+# (C) Martin Vaeth <martin@mvath.de>
+
+# Configure variables:
+
+# "Push VAR args" will append args to a "pseudo-array" VAR.
+# "Push -c VAR args" will clear VAR in advance. args may be empty.
+Push() {
+	case "${1}" in
+	-*)	shift
+		eval "${1}=''";;
+	esac
+	PushD_="${1}"
+	shift
+	eval "for PushA_
+	do	[ -z \"\${${PushD_}}\" ] && ${PushD_}=\\' \
+			|| ${PushD_}=\"\${${PushD_}} '\"
+		PushB_=\"\${PushA_}\"
+		while {
+			PushC_=\"\${PushB_%%\\'*}\"
+			[ \"\${PushC_}\" != \"\${PushB_}\" ]
+		}
+		do	${PushD_}=\"\${${PushD_}}\${PushC_}'\\\\''\"
+			PushB_=\"\${PushB_#*\\'}\"
+		done
+		${PushD_}=\"\${${PushD_}}\${PushB_}'\"
+	done"
+}
+
+Echon() {
+	printf '%s' "${*}"
+}
+
+# Forbid output of certain commands, UIDs, or GIDs.
+# Of course, this is not absolutely realiable but better than nothing to
+# deal with irritating privacy-breakers like acroread.
+# Note that matching for commands or UIDs is not supported by all kernels.
+
+Push -c NOPHONECMD
+Push -c NOPHONEUID
+Push -c NOPHONEGID
+
+# If one of the following is set, then only output is allowed if the
+# command, UID or GID matches.
+# Note that matching for commands or UIDs is not supported by all kernels.
+
+Push -c OUTONLYCMD
+Push -c OUTONLYUID
+Push -c OUTONLYGID
+
+# OUTPUT to LOCALNETSOUT is not filtered, independent of the above settings.
+
+Push -c LOCALNETSOUT '192.168.0.0/16'
+
+# LOCALNETSIN are dropped for all input from the outside except from
+# "trusted interfaces" - this is an anti-spoofing measurement.
+# (127.0.0.0/24 is automagically included in this anti-spoofing scheme).
+
+Push -c LOCALNETSIN
+
+# A simple portknocking solution if PORTKNOCK is "true"(=":")
+# If the sequence KNOCKSEQ arrives on a tcp port, accept the last one.
+# Each knock must appear within KNOCKTIMEOUT seconds.
+# If KNOCKTIMEOUT is empty or 0, an infinite timeout is used.
+# If KNOCKSEQ is empty, PORTKNOCK and KNOCKTMIMEOUT are not used.
+# You need the recent module for this feature.
+PORTKNOCK=:
+Push -c KNOCKSEQ
+KNOCKTIMEOUT=60
+# Logging is not necessarily a good idea (too easy to spot in logfile).
+LOGKNOCKING=false
+
+# Tacitly drop the following protocols:
+Push -c DROP_PROTO 'igmp'
+
+# Never reject but drop those ports which are typically called by
+# learn-resistant programs (which will not react on reject anyway).
+# Moreover, these addresses are locked out for some period (see KillMe)
+# This means that you should not include ports here which you use as a
+# knocking sequence since otherwise the knocking host can get locked out
+# before he can complete the sequence.
+
+Push -c DROP_NOT_REJECT
+
+# Reject/Drop without logging those ports which are typically called
+# by learn-resistant programs (this saves a lot of log space)
+
+Push -c REJECT_TACITLY
+
+# Allow for everybody:
+# (ICMP without a number means protocol 4 *and* 6).
+# Some notes concerning ICMP for a typical single-user system:
+# You should always allow types 3 4 11 12 and perhaps pong/ping (types 0 8)
+# rate-limited. It is usually better to *not* include the types
+#   redirect
+#   timestamp-request timestamp-reply
+#   address-mask-request address-mask-reply
+# Instead of allowing type 3 (destination-unreachable) generally,
+# you might also waant to allow only certain subtypes.
+
+Push -c ALLOWICMPLIMITED 'echo-reply' 'echo-request'
+Push -c ALLOWICMP4LIMITED
+Push -c ALLOWICMP6LIMITED
+Push -c ALLOWICMP 'destination-unreachable' 'source-quench' \
+	'time-exceeded' 'parameter-problem'
+Push -c ALLOWICMP4
+Push -c ALLOWICMP6 'router-solicitation' 'router-advertisement' \
+		'neighbour-solicitation' 'neighbour-advertisement'
+Push -c ALLOWPROTOCOL
+Push -c ALLOWTCP
+Push -c ALLOWUDP
+
+# Allow for "trusted interfaces" in addition:
+
+Push -c TRUSTEDICMP
+Push -c TRUSTEDICMP4
+Push -c TRUSTEDICMP6
+Push -c TRUSTEDPROTOCOL
+Push -c TRUSTEDTCP
+Push -c TRUSTEDUDP
+
+# The above "trusted interfaces" (you may use the "+" wildcard like "eth+"):
+
+Push -c TRUSTEDIF
+
+# Do we act as a router? If yes, which interfaces and address range?
+# If you use this you should call on the clients something like
+#	route add -net default gw router-ip
+# and make sure that /etc/resolv.conf is set appropriately.
+
+ROUTING=false
+Push -c ROUTESOURCEIF 'eth+'
+Push -c ROUTESOURCEIP '192.168.0.0/16'
+Push -c ROUTEDESTIF 'ppp+' 'ippp+' 'dsl+'
+
+# Reject (rate-limited) with value depending on the protocol.
+# Also determine how we should reject if the protocol is unknown.
+
+REJECTICMP='icmp-admin-prohibited'
+REJECTUDP='icmp-port-unreachable'
+REJECTTCP='tcp-reset'
+REJECTUNKNOWN='icmp-proto-unreachable'
+REJECTUNKNOWNPROTO='icmp'
+
+# Always log with a rate limit:
+Log() {
+	printf '%s ' \
+		-j LOG \
+		-m limit --limit 20/minute --limit-burst 20 \
+		--log-level warning \
+		--log-tcp-options \
+		--log-ip-options \
+		--log-prefix
+	printf "'firewall-%s '" "${1}"
+}
+
+# Reject with a rate limit:
+# hashlimit (i.e. on a per-host basis) is probably more reasonable than
+# a global limit for all hosts, therefore the first function is preferrable
+# if it is accepted by the kernel and the iptables version.
+Reject() {
+	printf '%s ' \
+		-m hashlimit \
+		--hashlimit 10/minute \
+		--hashlimit-burst 10 \
+		--hashlimit-mode srcip \
+		--hashlimit-name limreject \
+		-j REJECT
+}
+#Reject() { printf '%s' '-m limit --limit 10/minute -j REJECT'; }
+
+# For limited accepts (like ping requests) we also set a limit.
+# Also here -m hashlimit is preferrable over -m limit if supported.
+LimAccept() {
+	printf '%s ' \
+		-m hashlimit \
+		--hashlimit 50/minute \
+		--hashlimit-burst 20 \
+		--hashlimit-mode srcip \
+		--hashlimit-name limaccept \
+		-j ACCEPT
+}
+#LimAccept() { printf '%s' '-m limit --limit 60/minute -j ACCEPT'; }
+
+
+# DROP and lock this IP until it remains tacit for KILLMETIMEOUT seconds.
+# This is for the guys who have hit DROP_NOT_REJECT, tried spoofing,
+# or have sent strange packets.
+# Note that using this feature might be dangerous since somebody can misuse it
+# to lock you out without much effort (if he can fake your IP); (you can still
+# evade such an attack by using other TTL fields).
+# On the other hand, it can reduce traffic especially from typical zombies.
+# Set USETIMEOUT=false or use timeout 0 to switch off this feature.
+# Of course, you need the recent module in your kernel for this feature.
+# The mode (normal, mildly, softly) describes the "badness" of the packet.
+USETIMEOUT=:
+NORMALTIMEOUT=600
+MILDLYTIMEOUT=5
+SOFTLYTIMEOUT=0
+# The name of the list used for -m recent (empty means DEFAULT):
+NORMALLIST=''
+MILDLYLIST='MILDLY'
+SOFTLYLIST='SOFTLY'
+# The action to be taken for bad packets:
+KillMeNormal() {
+	Echon '-j DROP'
+}
+KillMeMildly() {
+	KillMeNormal
+}
+KillMeSoftly() {
+	KillMeMildly
+}
+# We check with the following function whether the corresponding recent list
+# has become active. Note that --update is extremely aggressive here,
+# since it means that the delay is prolonged.
+CheckRecentNormal() {
+	Echon '--update --rttl'
+}
+CheckRecentMildly() {
+	Echon '--name ${MILDLYLIST} --rcheck --rttl'
+}
+CheckRecentSoftly() {
+	Echon '--name ${SOFTLYLIST} --rcheck --rttl'
+}
+# If the above check succeeds, we kill the packet in the following manner:
+KillMeRecentNormal() {
+	KillMeNormal
+}
+KillMeRecentMildly() {
+	KillMeRecentNormal
+}
+KillMeRecentSoftly() {
+	KillMeRecentMildly
+}
+
+# Script for setting kernel variables:
+
+SYSCTL='sysctl.net'
+
+# Arguments for the above script
+
+Push -c SYSCTLARGS
+# In firewall.config you might want to have something like
+#! ${ROUTING} || Push SYSCTLARGS 'ppp*' 'ippp*' 'dsl*'
+
+# Probably, this can also be -j for older iptables versions.
+GOTO='-g'
+
+# Do we use iptables, ipt6ables
+# (We die/warn if it is not available).
+IPT4=:
+IPT6=:
+
+# Source a script to possibly override the above default settings:
+# Usually, you will only use this to modify the above array variables or
+# functions so that certain services will not be blocked.
+
+if test -r /etc/firewall.config
+then	. /etc/firewall.config
+else	. firewall.config
+fi
+
+set -f
+
+Message() {
+	printf '%s\n' "${0##*/}: ${*}" >&2
+}
+
+Fatal() {
+	Message "fatal: ${*}"
+	exit 2
+}
+
+Warning() {
+	Message "warning: ${*}"
+}
+
+Echo() {
+	printf '%s\n' "${*}"
+}
+
+EchoAndExec() {
+	Echo "${@}"
+	"${@}"
+}
+
+Usage() {
+	Echo "Usage: ${0##*/} [options] on|off|close|show
+on:     Shut the filter rules on  (this is the normal mode)
+off:    Shut all filter rules off (thus allowing all traffic)
+close:  Forbid *anything* to go in or out (e.g. during booting)
+show:   Show current filter rules
+
+The following options are available:
+-k:   Do not execute ${SYSCTL}
+-s:   Show which commands would be executed, but do not execute anything
+-S:   Show command before executing it
+-h:   Show this help and exit
+-p:   Enable  portknocking settings
+-P:   Disable portknocking settings
+-a PORT      Allow new tcp input connection on PORT
+-a PORT/ADDR Allow new tcp input connection on PORT from ADDR
+-A PORT      Allow new udp input connection on PORT
+-A PORT/ADDR Allow new udp input connection on PORT from ADDR
+The options -a and -A can be used repeatedly.
+
+This script does not load any kernel modules for you.
+Therefore, you have to modprobe some of the following modules in advance
+(it depends on your setting which you will need):
+ip_tables
+ip_conntrack
+ip_conntrack_ftp (use this only if you cannot avoid using active ftp mode:
+                 this module is always a security risk).
+ip6 (currently, this script only supports blocking ip6 completely)."
+	exit ${1:-1}
+}
+
+doexec=''
+kernelset=:
+OPTIND=1
+while getopts 'ksSpPa:A:Hh?' opt
+do	case "${opt}" in
+	k)	kernelset=false;;
+	s)	doexec='Echo';;
+	S)	doexec='EchoAndExec';;
+	p)	PORTKNOCK=false;;
+	P)	PORTKNOCK=:;;
+	a)	Push ALLOWTCP "${OPTARG}";;
+	A)	Push ALLOWUDP "${OPTARG}";;
+	*)	Usage 0;;
+	esac
+done
+shift $(( ${OPTIND} - 1 ))
+
+case "${1}" in
+close)
+	mode="${1}";;
+on|start)
+	mode='on';;
+off|stop)
+	mode='off';;
+show|status)
+	mode='show';;
+*)
+	Usage;;
+esac
+
+[ -n "${KNOCKSEQ}" ] || PORTKNOCK=false
+
+KillMeVar() {
+	eval "timeouts=\"`${2}`\"
+	timeoutvar=\"\${${3}}\""
+	${USETIMEOUT} && [ -n "${timeoutvar}" ] && [ "${timeoutvar}" -gt 0 ] \
+		|| timeoutvar=''
+	if [ -n "${timeoutvar}" ]
+	then	if [ -n "${4}" ]
+		then	timeouts="-m recent --name ${4} --set ${timeouts}"
+		else	timeouts="-m recent --set ${timeouts}"
+		fi
+	fi
+	eval "${1}=\"\${timeouts}\"
+	${3}=\"\${timeoutvar}\""
+}
+KillMeVar normal KillMeNormal NORMALTIMEOUT "${NORMALLIST}"
+KillMeVar mildly KillMeMildly MILDLYTIMEOUT "${MILDLYLIST}"
+KillMeVar softly KillMeSoftly SOFTLYTIMEOUT "${SOFTLYLIST}"
+
+if ${IPT4} && ! command -v iptables >/dev/null 2>&1
+then	Fatal 'cannot find iptables' # "Warning" or "Fatal" depends on the taste
+	IPT4=false
+fi
+if ${IPT6} && ! command -v ip6tables >/dev/null 2>&1
+then	Fatal 'cannot find ip6tables' # "Warning" or "Fatal" depends on the taste
+	IPT6=false
+fi
+
+Table4() {
+#	Echo "  IPT4: ${*}"
+	! ${IPT4} || ${doexec} iptables "${@}"
+}
+
+Table6() {
+#	Echo "  IPT6: ${*}"
+	! ${IPT6} || ${doexec} ip6tables "${@}"
+}
+
+Tables() {
+	Table4 "${@}"
+	Table6 "${@}"
+}
+
+if test -r "/proc/net/ip_tables_names"
+then	Push -c IP4TABLES `sort '/proc/net/ip_tables_names'`
+else	Push -c IP4TABLES 'filter' 'mangle'
+fi
+if test -r "/proc/net/ip6_tables_names"
+then	Push -c IP6TABLES `sort '/proc/net/ip6_tables_names'`
+else	Push -c IP6TABLES 'filter'
+fi
+
+if [ "${mode}" = "show" ]
+then	PATH="/usr/lib/cw:${PATH}"
+	have_printed=false
+	PrintStat() {
+		prntc="${1}"
+		prntp="${2}"
+		eval "set -- ${3}"
+		for prnti
+		do	${have_printed} && printf '\n\n'
+			printf 'Table "%s" (%s):\n' "${prnti}" "${prntp}"
+			"${prntc}" -t "${prnti}" -nvL
+			have_printed=:
+		done
+	}
+	! ${IPT4} || PrintStat iptables "IPv4" "${IP4TABLES}"
+	! ${IPT6} || PrintStat ip6tables "IPv6" "${IP6TABLES}"
+	exit 0
+fi
+
+if ${kernelset}
+then	eval "set -- ${SYSCTLARGS}"
+	${doexec} "${SYSCTL}" "${@}" || Warning "${SYSCTL} failed with status ${?}"
+fi
+
+# First the default (filter) tables:
+
+Tables -P INPUT   DROP
+Tables -P FORWARD DROP
+Tables -P OUTPUT  DROP
+Tables -F
+
+SwitchOff() {
+	swoffc="${1}"
+	eval "set -- ${2}"
+	for swoffi
+	do	"${swoffc}" -t "${swoffi}" -F
+		"${swoffc}" -t "${swoffi}" -X
+		"${swoffc}" -t "${swoffi}" -Z
+		case "${swoffi}" in
+		nat|mangle)
+			:;;
+		*)
+			continue;;
+		esac
+		"${swoffc}" -t "${swoffi}" -P PREROUTING ACCEPT
+		"${swoffc}" -t "${swoffi}" -P POSTROUTING ACCEPT
+		"${swoffc}" -t "${swoffi}" -P OUTPUT ACCEPT
+		if [ "${swoffi}" = "mangle" ]
+		then	"${swoffc}" -t "${swoffi}" -P INPUT ACCEPT
+			"${swoffc}" -t "${swoffi}" -P FORWARD ACCEPT
+		fi
+	done
+}
+
+SwitchOff Table4 "${IP4TABLES}"
+SwitchOff Table6 "${IP6TABLES}"
+
+case "${mode}" in
+off)
+	Tables -P INPUT ACCEPT
+	Tables -P FORWARD ACCEPT
+	Tables -P OUTPUT ACCEPT
+	exit 0;;
+close)
+	exit 0;;
+esac
+
+# This is currently a hack:
+# We execute no further ip6tables commands (i.e. IPv6 is always dropped)
+
+IPT6=false
+
+
+
+# FORWARD:
+
+Table4 -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+if ${ROUTING}
+then	eval "set -- ${ROUTESOURCEIF}"
+	for i
+	do	eval "set -- ${ROUTEDESTIF}"
+		for j
+		do	eval "set -- ${ROUTESOURCEIP}"
+			for k
+			do	Table4 -A FORWARD -i "${i}" -o "${j}" -s "${k}" ! -d "${k}" -j ACCEPT
+				Table4 -A FORWARD -o "${i}" -i "${j}" -d "${k}" ! -s "${k}" -j ACCEPT
+			done
+		done
+	done
+fi
+eval Tables -A FORWARD `Log 'FORWARD-bad'`
+#Tables -A FORWARD -j DROP # is the policy
+
+# POSTROUTING:
+if ${ROUTING}
+then	eval "set -- ${ROUTEDESTIF}"
+	for i
+	do	eval "set -- ${ROUTESOURCEIP}"
+		for j
+		do	Table4 -t nat -A POSTROUTING -o "${i}" -s "${j}" ! -d "${j}" -j MASQUERADE
+		done
+	done
+fi
+
+
+# OUTPUT:
+
+Tables -A OUTPUT -o lo -j ACCEPT
+eval "set -- 128.0.0.0/24 ${LOCALNETSOUT}"
+for i
+do	Tables -A OUTPUT -d "${i}" -j ACCEPT
+done
+eval Tables -A OUTPUT -m state --state INVALID `Log 'OUTPUT-invalid'`
+Tables -A OUTPUT -m state --state INVALID -j DROP
+
+# icmp handling of OUTPUT:
+
+eval Table4 -A OUTPUT `Log 'OUTPUT-traceroute'` -p icmp --icmp-type time-exceeded
+Table4 -A OUTPUT -p icmp --icmp-type time-exceeded -j DROP
+eval Table6 -A OUTPUT `Log 'OUTPUT-traceroute'` -p icmpv6 --icmpv6-type time-exceeded
+Table6 -A OUTPUT -p icmpv6 --icmpv6-type time-exceeded -j DROP
+eval "set -- fragmentation-needed network-prohibited host-prohibited communication-prohibited"
+for i
+do	Table4 -A OUTPUT -p icmp --icmp-type "${i}" -j ACCEPT
+	Table6 -A OUTPUT -p icmpv6 --icmpv6-type "${i}" -j ACCEPT
+done
+Table4 -A OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
+Table6 -A OUTPUT -p icmpv6 --icmpv6-type destination-unreachable -j DROP
+Table6 -A OUTPUT -p icmpv6 -j ACCEPT
+Tables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Accept NEW output only if not from NOPHONE and in OUTONLY
+
+eval "set -- ${NOPHONECMD}"
+for i
+do	eval Tables -A OUTPUT -m owner --cmd-owner \"\${i}\" `Log 'OUTPUT-phone'`
+	Tables -A OUTPUT -m owner --cmd-owner "${i}" -j DROP
+done
+eval "set -- ${NOPHONEUID}"
+for i
+do	eval Tables -A OUTPUT -m owner --uid-owner \"\${i}\" `Log 'OUTPUT-phone'`
+	Tables -A OUTPUT -m owner --uid-owner "${i}" -j DROP
+done
+eval "set -- ${NOPHONEGID}"
+for i
+do	eval Tables -A OUTPUT -m owner --gid-owner \"\${i}\" `Log 'OUTPUT-phone'`
+	Tables -A OUTPUT -m owner --gid-owner "${i}" -j DROP
+done
+perm="OUTPUT"
+if [ -n "${OUTONLYCMD}" ] || [ -n "${OUTONLYUID}" ] || [ -n "${OUTONLYGID}" ]
+then	perm="permit"
+	Tables -N "${perm}"
+	eval "set -- ${OUTONLYCMD}"
+	for i
+	do	Tables -A OUTPUT -m owner --cmd-owner "${i}" ${GOTO} "${perm}"
+	done
+	eval "set -- ${OUTONLYUID}"
+	for i
+	do	Tables -A OUTPUT -m owner --uid-owner "${i}" ${GOTO} "${perm}"
+	done
+	eval "set -- ${OUTONLYGID}"
+	for i
+	do	Tables -A OUTPUT -m owner --gid-owner "${i}" ${GOTO} "${perm}"
+	done
+	eval Tables -A OUTPUT `Log 'OUTPUT-nonmatch'`
+	#Tables -A OUTPUT -j DROP # is the Policy
+fi
+Tables -A "${perm}" -m state --state NEW -j ACCEPT
+eval Tables -A \"\${perm}\" `Log 'OUTPUT-error'`
+#Tables -A "${perm}" -j DROP # is the Policy
+
+
+# Before we build the INPUT chain, we create some auxiliary chains:
+
+# The chain "rej_drop" rejects or drops, depending on the rate limit.
+# If the protocol is known, it is faster to use one of the corresponding
+# chains "rej_tcp" "rej_udp" "rej_icmp".
+
+Tables -N rej_drop
+MakeRejTable() {
+	# create the rej_* (${1}) table and a protocol-tested (${2}) jump from rej_drop.
+	# If there is a third argument, then also drop those ports which
+	# should never be rejected in the rej_* table.
+	rejc="${1}"
+	rejp="${2}"
+	shift 2
+	Tables -N "${rejc}"
+	Tables -A rej_drop -p "${rejp}" ${GOTO} "${rejc}"
+	[ ${#} -ge 1 ] || return
+	eval "set -- ${DROP_NOT_REJECT}"
+	for rejk
+	do	Tables -A "${rejc}" -p "${rejp}" --dport "${rejk}" ${normal}
+	done
+}
+
+for j in icmp tcp udp drop
+do	i="rej_${j}"
+	proto="${j}"
+	case "${proto}" in
+	icmp)
+		j="${REJECTICMP}"; MakeRejTable "${i}" "${proto}";;
+	tcp)
+		j="${REJECTTCP}";  MakeRejTable "${i}" "${proto}" 1;;
+	udp)
+		j="${REJECTUCP}";  MakeRejTable "${i}" "${proto}" 1;;
+	*)
+		j="${REJECTUNKNOWN}"; proto="${REJECTUNKNOWNPROTO}";;
+	esac
+
+	# If the rate limit is not reached, we reject with the proper signal:
+	eval Tables -A \"\${i}\" -p \"\${proto}\" `Reject` --reject-with \"\${j}\"
+
+	# The limit is reached: We log (with a rate limit, of course) and drop:
+	eval Tables -A \"\${i}\" `Log 'reject-ratelimit'`
+	Tables -A "${i}" -j DROP
+done
+
+# The chain "lim_acc" accepts unless the rate limit is reached:
+
+Tables -N lim_acc
+eval Tables -A lim_acc `LimAccept`
+# The limit is reached: We log (with a rate limit, of course) and drop
+eval Tables -A lim_acc `Log 'accept-ratelimit'`
+Tables -A lim_acc -j DROP
+
+
+# INPUT:
+
+Tables -A INPUT -i lo -j ACCEPT
+eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT-spoof'`
+Tables -A INPUT -d 127.0.0.0/24 ${mildly}
+Tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+KillMeTimeout() {
+	[ -z "${1}" ] || \
+	eval Tables -A INPUT -m recent `${2}` --seconds \"\${1}\" `${3}`
+}
+KillMeTimeout "${NORMALTIMEOUT}" CheckRecentNormal KillMeRecentNormal
+KillMeTimeout "${MILDLYTIMEOUT}" CheckRecentMildly KillMeRecentMildly
+KillMeTimeout "${SOFTLYTIMEOUT}" CheckRecentSoftly KillMeRecentSoftly
+
+eval Tables -A INPUT -m state --state INVALID `Log 'INPUT-invalid'`
+Tables -A INPUT -m state --state INVALID ${softly}
+#eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT-broadcast'`
+Tables -A INPUT -m pkttype --pkt-type broadcast ${GOTO} rej_drop
+eval Tables -A INPUT -p tcp '!' --syn -m state --state NEW `Log 'INPUT-strange'`
+Tables -A INPUT -p tcp '!' --syn -m state --state NEW ${softly}
+if ${ROUTING}
+then	eval "set -- ${ROUTESOURCEIF}"
+	for i
+	do	eval "set -- ${ROUTESOURCEIP}"
+		for j
+		do	Table4 -A INPUT -i "${i}" -s "${j}" ! -d "${j}" -j ACCEPT
+		done
+	done
+fi
+
+# Each protocol of icmp/tcp/udp is treated in a separate chain.
+#
+# This takes more memory and is a more complicated setup, but it is faster,
+# because it means e.g. that a udp-packet does not first have to undergo
+# all sorts of icmp tests.
+#
+# For the trusted interface, we also have one chain for each protocol.
+# Since we jump from the trusted to the corresponding untrusted chain,
+# we define the latter three chains first.
+
+# ICMP trusted
+
+Tables -N icmp_trst
+eval "set -- ${TRUSTEDICMP}" "${ALLOWICMPLIMITED}" \
+	"${TRUSTEDICMP4}" "${ALLOWICMP4LIMITED}"
+for i
+do	Table4 -A icmp_trst -p icmp --icmp-type "${i}" -j ACCEPT
+done
+eval "set -- ${TRUSTEDICMP}" "${ALLOWICMPLIMITED}" \
+	"${TRUSTEDICMP6}" "${ALLOWICMP6LIMITED}"
+for i
+do	Table6 -A icmp_trst -p icmp6 --icmp-type "${i}" -j ACCEPT
+done
+
+# TCP trusted
+
+Tables -N tcp_trst
+eval "set -- ${TRUSTEDTCP}"
+for i
+do	Tables -A tcp_trst -p tcp --dport "${i}" -j ACCEPT
+done
+
+# UDP trusted
+
+Tables -N udp_trst
+eval "set -- ${TRUSTEDUDP}"
+for i
+do	Tables -A udp_trst -p udp --dport "${i}" -j ACCEPT
+done
+
+# Now the "main" chains for the three protocols:
+
+# This function defines the goto to the trusted (${1_trst}) chain:
+JumpTrusted() {
+	trustc="${1}"
+	trustd="${2}"
+	eval "set -- ${TRUSTEDIF}"
+	for i
+	do	Tables -A "${trustc}" -i "${i}" ${GOTO} "${trustd}"
+	done
+}
+
+DestSpoof() {
+	spofc="${1}"
+	eval "set -- ${LOCALNETSIN}"
+	for spofi
+	do	eval Tables -A \"\${spofc}\" -s \"\${spofi}\" `Log 'INPUT-spoof'`
+		Tables -A "${spofc}" -s "${spofi}" ${mildly}
+	done
+}
+
+# This function rejects tacitly (without logging) the "bad ports"
+# Arguments: chain, protocol, destination chain
+RejectBadPorts() {
+	badc="${1}"
+	badp="${2}"
+	badd='rej_drop'
+	[ ${#} -ge 3 ] && badd="${3}"
+	eval "set -- ${REJECT_TACITLY}"
+	for i
+	do	Tables -A "${badc}" -p "${badp}" --dport "${i}" ${GOTO} "${badd}"
+	done
+}
+
+HitCount() {
+	[ ${1} -le 1 ] || printf '%s' "--hitcount ${1}"
+}
+
+PortKnock() {
+	knockc="${1}"
+	knockd="${2}"
+	eval "set -- ${KNOCKSEQ}"
+	knocki=${#}
+	[ ${knocki} -eq 0 ] && return
+	[ -n "${KNOCKTIMEOUT}" ] && [ "${KNOCKTIMEOUT}" -gt 0 ] && \
+		tout="--seconds ${KNOCKTIMEOUT}"
+	Tables -N goodknock
+	Tables -A goodknock -m recent --name KNOCK --set
+	${LOGKNOCKING} && Tables -A goodknock `Log 'knocking'`
+	Tables -A goodknock -m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` -j ACCEPT
+	Tables -A goodknock ${GOTO} "${knockd}"
+
+	while [ ${knocki} -gt 1 ]
+	do	eval "knocka=\"\${${knocki}}\""
+		knocki=$(( ${knocki} - 1 ))
+		Tables -A "${knockc}" -p tcp --dport "${knocka}" \
+			-m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` ${GOTO} goodknock
+	done
+	Tables -A "${knockc}" -p tcp --dport "${1}" ${GOTO} goodknock
+	Tables -A "${knockc}" -m recent --name KNOCK --remove
+	Tables -A "${knockc}" ${GOTO} "${knockd}"
+}
+
+# ICMP
+
+Tables -N icmp_in
+eval "set -- ${ALLOWICMP}" "${ALLOWICMP4}"
+for i
+do	Table4 -A icmp_in -p icmp --icmp-type "${i}" -j ACCEPT
+done
+eval "set -- ${ALLOWICMP}" "${ALLOWICMP6}"
+for i
+do	Table6 -A icmp_in -p icmp6 --icmp-type "${i}" -j ACCEPT
+done
+JumpTrusted icmp_in icmp_trst
+DestSpoof icmp_in
+eval "set -- ${ALLOWICMPLIMITED}" "${ALLOWICMP4LIMITED}"
+for i
+do	Table4 -A icmp_in -p icmp --icmp-type "${i}" ${GOTO} lim_acc
+done
+eval "set -- ${ALLOWICMPLIMITED}" "${ALLOWICMP6LIMITED}"
+for i
+do	Table6 -A icmp_in -p icmp6 --icmp-type "${i}" ${GOTO} lim_acc
+done
+
+# TCP
+
+TCP_UNTRUSTED=tcp_in
+Tables -N "${TCP_UNTRUSTED}"
+JumpTrusted "${TCP_UNTRUSTED}" tcp_trst
+DestSpoof "${TCP_UNTRUSTED}"
+if ${PORTKNOCK}
+then	TCP_UNTRUSTED=tcp_extern
+	Tables -N "${TCP_UNTRUSTED}"
+	PortKnock tcp_in "${TCP_UNTRUSTED}"
+fi
+eval "set -- ${ALLOWTCP}"
+for i
+do	j="${i%/*}"
+	if [ "${j}" = "${i}" ]
+	then	Tables -A "${TCP_UNTRUSTED}" -p tcp --dport "${j}" -j ACCEPT
+	else	Tables -A "${TCP_UNTRUSTED}" -s "${i##*/}" -p tcp --dport "${j}" -j ACCEPT
+	fi
+done
+RejectBadPorts "${TCP_UNTRUSTED}" tcp rej_tcp
+
+# UDP
+
+Tables -N udp_in
+JumpTrusted udp_in udp_trst
+DestSpoof udp_in
+eval "set -- ${ALLOWUDP}"
+for i
+do	j="${i%/*}"
+	if [ "${j}" = "${i}" ]
+	then	Tables -A udp_in -p udp --dport "${j}" -j ACCEPT
+	else	Tables -A udp_in -s "${i##*/}" -p udp --dport "${j}" -j ACCEPT
+	fi
+done
+RejectBadPorts udp_in udp rej_udp
+
+# Finish the 6 above chains and the INPUT chain:
+
+# In all chains, we finish by the default action: logging and rejecting
+
+DefaultAction() {
+	eval Tables -A \"\${1}\" `Log "${3}"`
+	Tables -A "${1}" ${GOTO} "${2}"
+}
+for proto in icmp tcp udp
+do	case "${proto}" in
+	tcp)
+		inchain="${TCP_UNTRUSTED}";;
+	*)
+		inchain="${proto}_in";;
+	esac
+	DefaultAction "${inchain}" "rej_${proto}" "reject-${proto}"
+	DefaultAction "${proto}_trst" "rej_${proto}" "reject-trusted-${proto}"
+done
+
+# We will finish the same way for INPUT after protocol-selected jumps.
+# Note that we write the latter jumps only *after* the other chains
+# were completely finished:
+# This is important for the case that packets arrive while this script is
+# executed - in this case, we should drop the packets and not send them
+# to some unfinished chain.
+
+Tables -A INPUT -p icmp ${GOTO} icmp_in
+Tables -A INPUT -p tcp ${GOTO} tcp_in
+Tables -A INPUT -p udp ${GOTO} udp_in
+
+eval "set -- ${DROP_PROTO}"
+for proto
+do	Tables -A INPUT -p "${proto}" -j DROP
+done
+
+if [ -n "${TRUSTEDPROTOCOL}" ]
+then	Tables -N any_trst
+	eval "set -- ${TRUSTEDPROTOCOL}"
+	for proto
+	do	Tables -A any_trst -p "${proto}" -j ACCEPT
+	done
+	DefaultAction any_trst rej_drop "unknown-protocol"
+	JumpTrusted INPUT any_trst
+fi
+eval "set -- ${ALLOWPROTOCOL}"
+for proto
+do	Tables -A INPUT -p "${proto}" -j ACCEPT
+done
+DefaultAction INPUT rej_drop "unknown-protocol"
+
+exit 0
