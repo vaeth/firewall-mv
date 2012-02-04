@@ -1,0 +1,48 @@
+#!/sbin/runscript
+# Martin Vaeth <martin@mvath.de>
+
+description='start iptables based firewall'
+
+extra_commands='close off'
+
+description_close='close all connections'
+description_off='open all connections'
+
+depend() {
+	use logger
+	after iptables ip6tables fireclose
+}
+
+start() {
+	if yesno "${sysctl_on_start:-YES}"
+	then	ebegin "Starting sysctl.net and iptables based firewall"
+		firewall ${firewall_opts} on
+	else	ebegin "Starting iptables based firewall (without sysctl.net)"
+		firewall -k ${firewall_opts} on
+	fi
+	eend ${?}
+}
+
+close() {
+	if yesno "${sysctl_on_close:-YES}"
+	then	ebegin "Closing all connections (using iptables and sysctl.net)"
+		firewall close
+	else	ebegin "Closing all connections (using iptables only)"
+		firewall -k close
+	fi
+	eend ${?}
+}
+
+off() {
+	if yesno "${sysctl_on_off:-YES}"
+	then	ebegin "Opening all connections (using iptables and sysctl.net)"
+		firewall off
+	else	ebegin "Opening all connections (using iptables only)"
+		firewall -k off
+	fi
+	eend ${?}
+}
+
+stop() {
+	! yesno "${close_on_stop:-NO}" || close
+}

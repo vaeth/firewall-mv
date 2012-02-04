@@ -1,0 +1,7 @@
+# /etc/conf.d/fireclose: config file for /etc/init.d/fireclose
+
+# Run sysctl.net (otherwise -k is passed to firewall)
+with_sysctl="YES"
+
+# Closing on stop can be dangerous since it means we cut all connections:
+close_on_stop="NO"

@@ -25,4 +25,16 @@ sysctl.net initializes some net-related Linux sysctl variables.
 
 To get help, run firewall -h or sysctl.net -h, respectively.
 
-For Gentoo, there is an ebuild in the mv overlay (available by layman).
+For openrc (the Gentoo init system) there are some scripts provided in
+the openrc folder. Copy these scripts and their configs to /etc/init.d
+or /etc/conf.d, respectively and edit /etc/conf.d.
+To activate the firewall with openrc, call e.g.
+(the runlevels might depend on your configuration):
+	rc-config add fireclose boot
+	rc-config add firewall default
+Instead of adding fireclose to your boot runlevel, you might also want to
+add to your relevant /etc/conf.d/net* file(s):
+rc_need="fireclose"
+
+For Gentoo, there is an ebuild in the mv overlay (available by layman)
+which installs all files (but you still have to configure them).

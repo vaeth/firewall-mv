@@ -213,16 +213,18 @@ KillMeSoftly() {
 	KillMeMildly
 }
 # We check with the following function whether the corresponding recent list
-# has become active. Note that --update is extremely aggressive here,
-# since it means that the delay is prolonged.
+# has become active. Note that --update instead of --rcheck is extremely
+# aggressive here, since then the delay starts from 0 after too early attempts.
+# Use --rttl to avoid that some faker disconnects you forever (with the slight
+# risk that he might find other ways to avoid timeouts).
 CheckRecentNormal() {
 	Echon '--update --rttl'
 }
 CheckRecentMildly() {
-	Echon '--name ${MILDLYLIST} --rcheck --rttl'
+	Echon '--rcheck --rttl'
 }
 CheckRecentSoftly() {
-	Echon '--name ${SOFTLYLIST} --rcheck --rttl'
+	Echon '--rcheck --rttl'
 }
 # If the above check succeeds, we kill the packet in the following manner:
 KillMeRecentNormal() {
@@ -239,11 +241,15 @@ KillMeRecentSoftly() {
 
 SYSCTL='sysctl.net'
 
-# Arguments for the above script
+# Arguments for the above script for on, off, close
 
-Push -c SYSCTLARGS
+Push -c SYSCTLON
+Push -c SYSCTLOFF
+Push -c SYSCTLCLOSE
+
 # In firewall.config you might want to have something like
-#! ${ROUTING} || Push SYSCTLARGS 'ppp*' 'ippp*' 'dsl*'
+#! ${ROUTING} || Push SYSCTLON 'ppp*' 'ippp*' 'dsl*'
+#SYSCTLOFF="${SYSCTLON}"
 
 # Probably, this can also be -j for older iptables versions.
 GOTO='-g'
@@ -268,7 +274,7 @@ Message() {
 	printf '%s\n' "${0##*/}: ${*}" >&2
 }
 
-Fatal() {
+Die() {
 	Message "fatal: ${*}"
 	exit 2
 }
@@ -288,17 +294,19 @@ EchoAndExec() {
 
 Usage() {
 	Echo "Usage: ${0##*/} [options] on|off|close|show
-on:     Shut the filter rules on  (this is the normal mode)
-off:    Shut all filter rules off (thus allowing all traffic)
+on:     Switch filter rules on (normal start)
+off:    Shut off all filter rules (thus allowing all traffic)
 close:  Forbid *anything* to go in or out (e.g. during booting)
 show:   Show current filter rules
 
+Also ${SYSCTL} is called with configured arguments (except for \"show\")
+
 The following options are available:
--k:   Do not execute ${SYSCTL}
+-k:   Skip calling ${SYSCTL}
 -s:   Show which commands would be executed, but do not execute anything
 -S:   Show command before executing it
 -h:   Show this help and exit
--p:   Enable  portknocking settings
+-p:   Enable  portknocking settings (default if configured)
 -P:   Disable portknocking settings
 -a PORT      Allow new tcp input connection on PORT
 -a PORT/ADDR Allow new tcp input connection on PORT from ADDR
@@ -336,7 +344,7 @@ shift $(( ${OPTIND} - 1 ))
 
 case "${1}" in
 close)
-	mode="${1}";;
+	mode='close';;
 on|start)
 	mode='on';;
 off|stop)
@@ -349,30 +357,31 @@ esac
 
 [ -n "${KNOCKSEQ}" ] || PORTKNOCK=false
 
+ListName() {
+	eval "[ -n \"\${${1}}\" ] && Echon '--name \"\${${1}}\"'"
+}
+
 KillMeVar() {
 	eval "timeouts=\"`${2}`\"
 	timeoutvar=\"\${${3}}\""
 	${USETIMEOUT} && [ -n "${timeoutvar}" ] && [ "${timeoutvar}" -gt 0 ] \
 		|| timeoutvar=''
 	if [ -n "${timeoutvar}" ]
-	then	if [ -n "${4}" ]
-		then	timeouts="-m recent --name ${4} --set ${timeouts}"
-		else	timeouts="-m recent --set ${timeouts}"
-		fi
+	then	timeouts="-m recent "`ListName "${4}"`" --set ${timeouts}"
 	fi
 	eval "${1}=\"\${timeouts}\"
 	${3}=\"\${timeoutvar}\""
 }
-KillMeVar normal KillMeNormal NORMALTIMEOUT "${NORMALLIST}"
-KillMeVar mildly KillMeMildly MILDLYTIMEOUT "${MILDLYLIST}"
-KillMeVar softly KillMeSoftly SOFTLYTIMEOUT "${SOFTLYLIST}"
+KillMeVar normal KillMeNormal NORMALTIMEOUT NORMALLIST
+KillMeVar mildly KillMeMildly MILDLYTIMEOUT MILDLYLIST
+KillMeVar softly KillMeSoftly SOFTLYTIMEOUT SOFTLYLIST
 
 if ${IPT4} && ! command -v iptables >/dev/null 2>&1
-then	Fatal 'cannot find iptables' # "Warning" or "Fatal" depends on the taste
+then	Die 'cannot find iptables'
 	IPT4=false
 fi
 if ${IPT6} && ! command -v ip6tables >/dev/null 2>&1
-then	Fatal 'cannot find ip6tables' # "Warning" or "Fatal" depends on the taste
+then	Die 'cannot find ip6tables'
 	IPT6=false
 fi
 
@@ -403,25 +412,33 @@ fi
 if [ "${mode}" = "show" ]
 then	PATH="/usr/lib/cw:${PATH}"
 	have_printed=false
-	PrintStat() {
-		prntc="${1}"
-		prntp="${2}"
-		eval "set -- ${3}"
-		for prnti
-		do	${have_printed} && printf '\n\n'
-			printf 'Table "%s" (%s):\n' "${prnti}" "${prntp}"
-			"${prntc}" -t "${prnti}" -nvL
-			have_printed=:
-		done
-	}
+PrintStat() {
+	prntc="${1}"
+	prntp="${2}"
+	eval "set -- ${3}"
+	for prnti
+	do	${have_printed} && printf '\n\n'
+		printf 'Table "%s" (%s):\n' "${prnti}" "${prntp}"
+		"${prntc}" -t "${prnti}" -nvL
+		have_printed=:
+	done
+}
 	! ${IPT4} || PrintStat iptables "IPv4" "${IP4TABLES}"
 	! ${IPT6} || PrintStat ip6tables "IPv6" "${IP6TABLES}"
 	exit 0
 fi
 
 if ${kernelset}
-then	eval "set -- ${SYSCTLARGS}"
-	${doexec} "${SYSCTL}" "${@}" || Warning "${SYSCTL} failed with status ${?}"
+then	case "${mode}" in
+	on)
+		eval "set -- ${SYSCTLON}";;
+	off)
+		eval "set -- ${SYSCTLOFF}";;
+	close)
+		eval "set -- ${SYSCTLCLOSE}";;
+	esac
+	${doexec} "${SYSCTL}" "${@}" \
+		|| Die "${SYSCTL} failed with status ${?}"
 fi
 
 # First the default (filter) tables:
@@ -591,7 +608,7 @@ MakeRejTable() {
 	[ ${#} -ge 1 ] || return
 	eval "set -- ${DROP_NOT_REJECT}"
 	for rejk
-	do	Tables -A "${rejc}" -p "${rejp}" --dport "${rejk}" ${normal}
+	do	eval Tables -A \"\${rejc}\" -p \"\${rejp}\" --dport \"\${rejk}\" ${normal}
 	done
 }
 
@@ -630,23 +647,23 @@ Tables -A lim_acc -j DROP
 
 Tables -A INPUT -i lo -j ACCEPT
 eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT-spoof'`
-Tables -A INPUT -d 127.0.0.0/24 ${mildly}
+eval Tables -A INPUT -d '127.0.0.0/24' ${mildly}
 Tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 KillMeTimeout() {
 	[ -z "${1}" ] || \
-	eval Tables -A INPUT -m recent `${2}` --seconds \"\${1}\" `${3}`
+	eval Tables -A INPUT -m recent `ListName ${2}` `${3}` --seconds \"\${1}\" `${4}`
 }
-KillMeTimeout "${NORMALTIMEOUT}" CheckRecentNormal KillMeRecentNormal
-KillMeTimeout "${MILDLYTIMEOUT}" CheckRecentMildly KillMeRecentMildly
-KillMeTimeout "${SOFTLYTIMEOUT}" CheckRecentSoftly KillMeRecentSoftly
+KillMeTimeout "${NORMALTIMEOUT}" NORMALLIST CheckRecentNormal KillMeRecentNormal
+KillMeTimeout "${MILDLYTIMEOUT}" MILDLYLIST CheckRecentMildly KillMeRecentMildly
+KillMeTimeout "${SOFTLYTIMEOUT}" SOFTLYLIST CheckRecentSoftly KillMeRecentSoftly
 
 eval Tables -A INPUT -m state --state INVALID `Log 'INPUT-invalid'`
-Tables -A INPUT -m state --state INVALID ${softly}
+eval Tables -A INPUT -m state --state INVALID ${softly}
 #eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT-broadcast'`
 Tables -A INPUT -m pkttype --pkt-type broadcast ${GOTO} rej_drop
 eval Tables -A INPUT -p tcp '!' --syn -m state --state NEW `Log 'INPUT-strange'`
-Tables -A INPUT -p tcp '!' --syn -m state --state NEW ${softly}
+eval Tables -A INPUT -p tcp '!' --syn -m state --state NEW ${softly}
 if ${ROUTING}
 then	eval "set -- ${ROUTESOURCEIF}"
 	for i
@@ -714,7 +731,7 @@ DestSpoof() {
 	eval "set -- ${LOCALNETSIN}"
 	for spofi
 	do	eval Tables -A \"\${spofc}\" -s \"\${spofi}\" `Log 'INPUT-spoof'`
-		Tables -A "${spofc}" -s "${spofi}" ${mildly}
+		eval Tables -A \"\${spofc}\" -s \"\${spofi}\" ${mildly}
 	done
 }
 
@@ -732,7 +749,7 @@ RejectBadPorts() {
 }
 
 HitCount() {
-	[ ${1} -le 1 ] || printf '%s' "--hitcount ${1}"
+	[ ${1} -le 1 ] || Echon "--hitcount ${1}"
 }
 
 PortKnock() {
@@ -742,17 +759,17 @@ PortKnock() {
 	knocki=${#}
 	[ ${knocki} -eq 0 ] && return
 	[ -n "${KNOCKTIMEOUT}" ] && [ "${KNOCKTIMEOUT}" -gt 0 ] && \
-		tout="--seconds ${KNOCKTIMEOUT}"
+		tout='--seconds "${KNOCKTIMEOUT}"'
 	Tables -N goodknock
 	Tables -A goodknock -m recent --name KNOCK --set
 	${LOGKNOCKING} && Tables -A goodknock `Log 'knocking'`
-	Tables -A goodknock -m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` -j ACCEPT
+	eval Tables -A goodknock -m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` -j ACCEPT
 	Tables -A goodknock ${GOTO} "${knockd}"
 
 	while [ ${knocki} -gt 1 ]
 	do	eval "knocka=\"\${${knocki}}\""
 		knocki=$(( ${knocki} - 1 ))
-		Tables -A "${knockc}" -p tcp --dport "${knocka}" \
+		eval Tables -A \"\${knockc}\" -p tcp --dport \"\${knocka}\" \
 			-m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` ${GOTO} goodknock
 	done
 	Tables -A "${knockc}" -p tcp --dport "${1}" ${GOTO} goodknock

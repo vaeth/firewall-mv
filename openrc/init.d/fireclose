@@ -1,0 +1,22 @@
+#!/sbin/runscript
+# Martin Vaeth <martin@mvath.de>
+
+description='Start iptables based firewall to close all connections'
+
+depend() {
+	before net firewall
+}
+
+start() {
+	if yesno "${with_sysctl:-YES}"
+	then	ebegin "Closing all connections (using iptables and sysctl.net)"
+		firewall close
+	else	ebegin "Closing all connections (using iptables only)"
+		firewall -k close
+	fi
+	eend ${?}
+}
+
+stop() {
+	! yesno "${close_on_stop:-NO}" || start
+}
