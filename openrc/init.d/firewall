@@ -1,5 +1,5 @@
 #!/sbin/runscript
-# Martin Vaeth <martin@mvath.de>
+# Martin V\"ath <martin@mvath.de>
 
 description='start iptables based firewall'
 

@@ -1,6 +1,6 @@
 #! /bin/sh
-# This script is part of Martin Vaeth's firewall scripts.
-# (C) Martin Vaeth <martin@mvath.de>
+# This script is part of Martin V\"ath's firewall scripts.
+# (C) Martin V\"ath <martin@mvath.de>
 
 Usage() {
 	printf '%s\n' \
@@ -9,7 +9,7 @@ The arguments may contain wildcards, e.g. *ppp*"
 	exit ${1:-1}
 }
 
-case "${1}" in
+case ${1} in
 -[hH?])
 	Usage 0;;
 -*)

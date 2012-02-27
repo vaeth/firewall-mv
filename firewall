@@ -1,28 +1,28 @@
 #! /bin/sh
-# This script is part of Martin Vaeth's firewall scripts.
-# (C) Martin Vaeth <martin@mvath.de>
+# This script is part of Martin V\"ath's firewall scripts.
+# (C) Martin V\"ath <martin@mvath.de>
 
 # Configure variables:
 
 # "Push VAR args" will append args to a "pseudo-array" VAR.
 # "Push -c VAR args" will clear VAR in advance. args may be empty.
 Push() {
-	case "${1}" in
+	case ${1} in
 	-*)	shift
 		eval "${1}=''";;
 	esac
-	PushD_="${1}"
+	PushD_=${1}
 	shift
 	eval "for PushA_
 	do	[ -z \"\${${PushD_}}\" ] && ${PushD_}=\\' \
 			|| ${PushD_}=\"\${${PushD_}} '\"
-		PushB_=\"\${PushA_}\"
+		PushB_=\${PushA_}
 		while {
-			PushC_=\"\${PushB_%%\\'*}\"
+			PushC_=\${PushB_%%\\'*}
 			[ \"\${PushC_}\" != \"\${PushB_}\" ]
 		}
 		do	${PushD_}=\"\${${PushD_}}\${PushC_}'\\\\''\"
-			PushB_=\"\${PushB_#*\\'}\"
+			PushB_=\${PushB_#*\\'}
 		done
 		${PushD_}=\"\${${PushD_}}\${PushB_}'\"
 	done"
@@ -249,7 +249,7 @@ Push -c SYSCTLCLOSE
 
 # In firewall.config you might want to have something like
 #! ${ROUTING} || Push SYSCTLON 'ppp*' 'ippp*' 'dsl*'
-#SYSCTLOFF="${SYSCTLON}"
+#SYSCTLOFF=${SYSCTLON}
 
 # Probably, this can also be -j for older iptables versions.
 GOTO='-g'
@@ -270,8 +270,16 @@ fi
 
 set -f
 
+Echo() {
+	printf '%s\n' "${*}"
+}
+
 Message() {
-	printf '%s\n' "${0##*/}: ${*}" >&2
+	Echo "${0##*/}: ${*}" >&2
+}
+
+Warning() {
+	Message "warning: ${*}"
 }
 
 Die() {
@@ -279,16 +287,8 @@ Die() {
 	exit 2
 }
 
-Warning() {
-	Message "warning: ${*}"
-}
-
-Echo() {
-	printf '%s\n' "${*}"
-}
-
 EchoAndExec() {
-	Echo "${@}"
+	Echo "${*}"
 	"${@}"
 }
 
@@ -329,7 +329,7 @@ doexec=''
 kernelset=:
 OPTIND=1
 while getopts 'ksSpPa:A:Hh?' opt
-do	case "${opt}" in
+do	case ${opt} in
 	k)	kernelset=false;;
 	s)	doexec='Echo';;
 	S)	doexec='EchoAndExec';;
@@ -342,7 +342,7 @@ do	case "${opt}" in
 done
 shift $(( ${OPTIND} - 1 ))
 
-case "${1}" in
+case ${1} in
 close)
 	mode='close';;
 on|start)
@@ -362,15 +362,15 @@ ListName() {
 }
 
 KillMeVar() {
-	eval "timeouts=\"`${2}`\"
-	timeoutvar=\"\${${3}}\""
+	timeouts=`${2}`
+	eval "timeoutvar=\${${3}}"
 	${USETIMEOUT} && [ -n "${timeoutvar}" ] && [ "${timeoutvar}" -gt 0 ] \
 		|| timeoutvar=''
 	if [ -n "${timeoutvar}" ]
-	then	timeouts="-m recent "`ListName "${4}"`" --set ${timeouts}"
+	then	timeouts='-m recent '`ListName "${4}"`" --set ${timeouts}"
 	fi
-	eval "${1}=\"\${timeouts}\"
-	${3}=\"\${timeoutvar}\""
+	eval "${1}=\${timeouts}
+	${3}=\${timeoutvar}"
 }
 KillMeVar normal KillMeNormal NORMALTIMEOUT NORMALLIST
 KillMeVar mildly KillMeMildly MILDLYTIMEOUT MILDLYLIST
@@ -385,14 +385,17 @@ then	Die 'cannot find ip6tables'
 	IPT6=false
 fi
 
-Table4() {
-#	Echo "  IPT4: ${*}"
-	! ${IPT4} || ${doexec} iptables "${@}"
+eval "Table4() {
+	${doexec} iptables \"\${@}\"
 }
-
 Table6() {
-#	Echo "  IPT6: ${*}"
-	! ${IPT6} || ${doexec} ip6tables "${@}"
+	${doexec} ip6tables \"\${@}\"
+}"
+${IPT4} || Table4() {
+	:
+}
+${IPT6} || Table6() {
+	:
 }
 
 Tables() {
@@ -409,12 +412,12 @@ then	Push -c IP6TABLES `sort '/proc/net/ip6_tables_names'`
 else	Push -c IP6TABLES 'filter'
 fi
 
-if [ "${mode}" = "show" ]
+if [ "${mode}" = 'show' ]
 then	PATH="/usr/lib/cw:${PATH}"
 	have_printed=false
 PrintStat() {
-	prntc="${1}"
-	prntp="${2}"
+	prntc=${1}
+	prntp=${2}
 	eval "set -- ${3}"
 	for prnti
 	do	${have_printed} && printf '\n\n'
@@ -429,7 +432,7 @@ PrintStat() {
 fi
 
 if ${kernelset}
-then	case "${mode}" in
+then	case ${mode} in
 	on)
 		eval "set -- ${SYSCTLON}";;
 	off)
@@ -449,13 +452,13 @@ Tables -P OUTPUT  DROP
 Tables -F
 
 SwitchOff() {
-	swoffc="${1}"
+	swoffc=${1}
 	eval "set -- ${2}"
 	for swoffi
 	do	"${swoffc}" -t "${swoffi}" -F
 		"${swoffc}" -t "${swoffi}" -X
 		"${swoffc}" -t "${swoffi}" -Z
-		case "${swoffi}" in
+		case ${swoffi} in
 		nat|mangle)
 			:;;
 		*)
@@ -464,7 +467,7 @@ SwitchOff() {
 		"${swoffc}" -t "${swoffi}" -P PREROUTING ACCEPT
 		"${swoffc}" -t "${swoffi}" -P POSTROUTING ACCEPT
 		"${swoffc}" -t "${swoffi}" -P OUTPUT ACCEPT
-		if [ "${swoffi}" = "mangle" ]
+		if [ "${swoffi}" = 'mangle' ]
 		then	"${swoffc}" -t "${swoffi}" -P INPUT ACCEPT
 			"${swoffc}" -t "${swoffi}" -P FORWARD ACCEPT
 		fi
@@ -474,7 +477,7 @@ SwitchOff() {
 SwitchOff Table4 "${IP4TABLES}"
 SwitchOff Table6 "${IP6TABLES}"
 
-case "${mode}" in
+case ${mode} in
 off)
 	Tables -P INPUT ACCEPT
 	Tables -P FORWARD ACCEPT
@@ -565,9 +568,9 @@ for i
 do	eval Tables -A OUTPUT -m owner --gid-owner \"\${i}\" `Log 'OUTPUT-phone'`
 	Tables -A OUTPUT -m owner --gid-owner "${i}" -j DROP
 done
-perm="OUTPUT"
+perm='OUTPUT'
 if [ -n "${OUTONLYCMD}" ] || [ -n "${OUTONLYUID}" ] || [ -n "${OUTONLYGID}" ]
-then	perm="permit"
+then	perm='permit'
 	Tables -N "${perm}"
 	eval "set -- ${OUTONLYCMD}"
 	for i
@@ -600,8 +603,8 @@ MakeRejTable() {
 	# create the rej_* (${1}) table and a protocol-tested (${2}) jump from rej_drop.
 	# If there is a third argument, then also drop those ports which
 	# should never be rejected in the rej_* table.
-	rejc="${1}"
-	rejp="${2}"
+	rejc=${1}
+	rejp=${2}
 	shift 2
 	Tables -N "${rejc}"
 	Tables -A rej_drop -p "${rejp}" ${GOTO} "${rejc}"
@@ -614,16 +617,20 @@ MakeRejTable() {
 
 for j in icmp tcp udp drop
 do	i="rej_${j}"
-	proto="${j}"
-	case "${proto}" in
+	proto=${j}
+	case ${proto} in
 	icmp)
-		j="${REJECTICMP}"; MakeRejTable "${i}" "${proto}";;
+		j=${REJECTICMP}
+		MakeRejTable "${i}" "${proto}";;
 	tcp)
-		j="${REJECTTCP}";  MakeRejTable "${i}" "${proto}" 1;;
+		j=${REJECTTCP}
+		MakeRejTable "${i}" "${proto}" 1;;
 	udp)
-		j="${REJECTUCP}";  MakeRejTable "${i}" "${proto}" 1;;
+		j=${REJECTUCP}
+		MakeRejTable "${i}" "${proto}" 1;;
 	*)
-		j="${REJECTUNKNOWN}"; proto="${REJECTUNKNOWNPROTO}";;
+		j=${REJECTUNKNOWN}
+		proto=${REJECTUNKNOWNPROTO};;
 	esac
 
 	# If the rate limit is not reached, we reject with the proper signal:
@@ -718,8 +725,8 @@ done
 
 # This function defines the goto to the trusted (${1_trst}) chain:
 JumpTrusted() {
-	trustc="${1}"
-	trustd="${2}"
+	trustc=${1}
+	trustd=${2}
 	eval "set -- ${TRUSTEDIF}"
 	for i
 	do	Tables -A "${trustc}" -i "${i}" ${GOTO} "${trustd}"
@@ -727,7 +734,7 @@ JumpTrusted() {
 }
 
 DestSpoof() {
-	spofc="${1}"
+	spofc=${1}
 	eval "set -- ${LOCALNETSIN}"
 	for spofi
 	do	eval Tables -A \"\${spofc}\" -s \"\${spofi}\" `Log 'INPUT-spoof'`
@@ -738,10 +745,10 @@ DestSpoof() {
 # This function rejects tacitly (without logging) the "bad ports"
 # Arguments: chain, protocol, destination chain
 RejectBadPorts() {
-	badc="${1}"
-	badp="${2}"
+	badc=${1}
+	badp=${2}
 	badd='rej_drop'
-	[ ${#} -ge 3 ] && badd="${3}"
+	[ ${#} -ge 3 ] && badd=${3}
 	eval "set -- ${REJECT_TACITLY}"
 	for i
 	do	Tables -A "${badc}" -p "${badp}" --dport "${i}" ${GOTO} "${badd}"
@@ -753,8 +760,8 @@ HitCount() {
 }
 
 PortKnock() {
-	knockc="${1}"
-	knockd="${2}"
+	knockc=${1}
+	knockd=${2}
 	eval "set -- ${KNOCKSEQ}"
 	knocki=${#}
 	[ ${knocki} -eq 0 ] && return
@@ -767,7 +774,7 @@ PortKnock() {
 	Tables -A goodknock ${GOTO} "${knockd}"
 
 	while [ ${knocki} -gt 1 ]
-	do	eval "knocka=\"\${${knocki}}\""
+	do	eval "knocka=\${${knocki}}"
 		knocki=$(( ${knocki} - 1 ))
 		eval Tables -A \"\${knockc}\" -p tcp --dport \"\${knocka}\" \
 			-m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` ${GOTO} goodknock
@@ -812,7 +819,7 @@ then	TCP_UNTRUSTED=tcp_extern
 fi
 eval "set -- ${ALLOWTCP}"
 for i
-do	j="${i%/*}"
+do	j=${i%/*}
 	if [ "${j}" = "${i}" ]
 	then	Tables -A "${TCP_UNTRUSTED}" -p tcp --dport "${j}" -j ACCEPT
 	else	Tables -A "${TCP_UNTRUSTED}" -s "${i##*/}" -p tcp --dport "${j}" -j ACCEPT
@@ -827,7 +834,7 @@ JumpTrusted udp_in udp_trst
 DestSpoof udp_in
 eval "set -- ${ALLOWUDP}"
 for i
-do	j="${i%/*}"
+do	j=${i%/*}
 	if [ "${j}" = "${i}" ]
 	then	Tables -A udp_in -p udp --dport "${j}" -j ACCEPT
 	else	Tables -A udp_in -s "${i##*/}" -p udp --dport "${j}" -j ACCEPT
@@ -844,9 +851,9 @@ DefaultAction() {
 	Tables -A "${1}" ${GOTO} "${2}"
 }
 for proto in icmp tcp udp
-do	case "${proto}" in
+do	case ${proto} in
 	tcp)
-		inchain="${TCP_UNTRUSTED}";;
+		inchain=${TCP_UNTRUSTED};;
 	*)
 		inchain="${proto}_in";;
 	esac
