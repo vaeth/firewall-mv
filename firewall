@@ -9,7 +9,7 @@
 Push() {
 	case ${1} in
 	-*)	shift
-		eval "${1}=''";;
+		eval ${1}=;;
 	esac
 	PushD_=${1}
 	shift
@@ -199,7 +199,7 @@ NORMALTIMEOUT=600
 MILDLYTIMEOUT=5
 SOFTLYTIMEOUT=0
 # The name of the list used for -m recent (empty means DEFAULT):
-NORMALLIST=''
+NORMALLIST=
 MILDLYLIST='MILDLY'
 SOFTLYLIST='SOFTLY'
 # The action to be taken for bad packets:
@@ -325,7 +325,7 @@ ip6 (currently, this script only supports blocking ip6 completely)."
 	exit ${1:-1}
 }
 
-doexec=''
+doexec=
 kernelset=:
 OPTIND=1
 while getopts 'ksSpPa:A:Hh?' opt
@@ -363,9 +363,9 @@ ListName() {
 
 KillMeVar() {
 	timeouts=`${2}`
-	eval "timeoutvar=\${${3}}"
+	eval timeoutvar=\${${3}}
 	${USETIMEOUT} && [ -n "${timeoutvar}" ] && [ "${timeoutvar}" -gt 0 ] \
-		|| timeoutvar=''
+		|| timeoutvar=
 	if [ -n "${timeoutvar}" ]
 	then	timeouts='-m recent '`ListName "${4}"`" --set ${timeouts}"
 	fi
