@@ -145,14 +145,12 @@ REJECTUNKNOWNPROTO='icmp'
 
 # Always log with a rate limit:
 Log() {
-	printf '%s ' \
-		-j LOG \
+	Echon	-j LOG \
 		-m limit --limit 20/minute --limit-burst 20 \
 		--log-level warning \
 		--log-tcp-options \
 		--log-ip-options \
-		--log-prefix
-	printf "'firewall-%s '" "${1}"
+		--log-prefix "'firewall-${1} '"
 }
 
 # Reject with a rate limit:
@@ -160,28 +158,26 @@ Log() {
 # a global limit for all hosts, therefore the first function is preferrable
 # if it is accepted by the kernel and the iptables version.
 Reject() {
-	printf '%s ' \
-		-m hashlimit \
+	Echon	-m hashlimit \
 		--hashlimit 10/minute \
 		--hashlimit-burst 10 \
 		--hashlimit-mode srcip \
 		--hashlimit-name limreject \
 		-j REJECT
 }
-#Reject() { printf '%s' '-m limit --limit 10/minute -j REJECT'; }
+#Reject() { Echon -m limit --limit 10/minute -j REJECT; }
 
 # For limited accepts (like ping requests) we also set a limit.
 # Also here -m hashlimit is preferrable over -m limit if supported.
 LimAccept() {
-	printf '%s ' \
-		-m hashlimit \
+	Echon	-m hashlimit \
 		--hashlimit 50/minute \
 		--hashlimit-burst 20 \
 		--hashlimit-mode srcip \
 		--hashlimit-name limaccept \
 		-j ACCEPT
 }
-#LimAccept() { printf '%s' '-m limit --limit 60/minute -j ACCEPT'; }
+#LimAccept() { Echon -m limit --limit 60/minute -j ACCEPT; }
 
 
 # DROP and lock this IP until it remains tacit for KILLMETIMEOUT seconds.
@@ -204,7 +200,7 @@ MILDLYLIST='MILDLY'
 SOFTLYLIST='SOFTLY'
 # The action to be taken for bad packets:
 KillMeNormal() {
-	Echon '-j DROP'
+	Echon -j DROP
 }
 KillMeMildly() {
 	KillMeNormal
@@ -218,13 +214,13 @@ KillMeSoftly() {
 # Use --rttl to avoid that some faker disconnects you forever (with the slight
 # risk that he might find other ways to avoid timeouts).
 CheckRecentNormal() {
-	Echon '--update --rttl'
+	Echon --update --rttl
 }
 CheckRecentMildly() {
-	Echon '--rcheck --rttl'
+	Echon --rcheck --rttl
 }
 CheckRecentSoftly() {
-	Echon '--rcheck --rttl'
+	Echon --rcheck --rttl
 }
 # If the above check succeeds, we kill the packet in the following manner:
 KillMeRecentNormal() {
@@ -358,7 +354,7 @@ esac
 [ -n "${KNOCKSEQ}" ] || PORTKNOCK=false
 
 ListName() {
-	eval "[ -n \"\${${1}}\" ] && Echon '--name \"\${${1}}\"'"
+	eval "[ -n \"\${${1}}\" ] && Echon --name \"\${${1}}\""
 }
 
 KillMeVar() {
@@ -413,17 +409,18 @@ else	Push -c IP6TABLES 'filter'
 fi
 
 if [ "${mode}" = 'show' ]
-then	PATH="/usr/lib/cw:${PATH}"
-	have_printed=false
+then	PATH="/usr/lib/cw${PATH:+:}${PATH}"
+	print_separator=''
 PrintStat() {
 	prntc=${1}
 	prntp=${2}
 	eval "set -- ${3}"
 	for prnti
-	do	${have_printed} && printf '\n\n'
-		printf 'Table "%s" (%s):\n' "${prnti}" "${prntp}"
+	do	Echo "${print_separator}Table \"${prnti}\" (${prntp}):"
 		"${prntc}" -t "${prnti}" -nvL
-		have_printed=:
+		print_separator='
+
+'
 	done
 }
 	! ${IPT4} || PrintStat iptables "IPv4" "${IP4TABLES}"
@@ -756,7 +753,7 @@ RejectBadPorts() {
 }
 
 HitCount() {
-	[ ${1} -le 1 ] || Echon "--hitcount ${1}"
+	[ ${1} -le 1 ] || Echon --hitcount ${1}
 }
 
 PortKnock() {
@@ -834,11 +831,12 @@ JumpTrusted udp_in udp_trst
 DestSpoof udp_in
 eval "set -- ${ALLOWUDP}"
 for i
-do	j=${i%/*}
-	if [ "${j}" = "${i}" ]
-	then	Tables -A udp_in -p udp --dport "${j}" -j ACCEPT
-	else	Tables -A udp_in -s "${i##*/}" -p udp --dport "${j}" -j ACCEPT
-	fi
+do	case ${i} in
+	*/*)
+		Tables -A udp_in -s "${i##*/}" -p udp --dport "${i%/*}" -j ACCEPT;;
+	*)
+		Tables -A udp_in -p udp --dport "${i}" -j ACCEPT;;
+	esac
 done
 RejectBadPorts udp_in udp rej_udp
 
@@ -883,13 +881,13 @@ then	Tables -N any_trst
 	for proto
 	do	Tables -A any_trst -p "${proto}" -j ACCEPT
 	done
-	DefaultAction any_trst rej_drop "unknown-protocol"
+	DefaultAction any_trst rej_drop 'unknown-protocol'
 	JumpTrusted INPUT any_trst
 fi
 eval "set -- ${ALLOWPROTOCOL}"
 for proto
 do	Tables -A INPUT -p "${proto}" -j ACCEPT
 done
-DefaultAction INPUT rej_drop "unknown-protocol"
+DefaultAction INPUT rej_drop 'unknown-protocol'
 
 exit 0
