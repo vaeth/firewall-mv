@@ -15,6 +15,8 @@ is done with a separate script. Currently, IPv6 is not supported by the script.
 To install this project, copy the scripts into your path.
 firewall.config can also be copied into your /etc directory.
 
+You also need push.sh from http://github.com/vaeth/push in your path.
+
 Before you run firewall, please edit firewall.config to your needs.
 
 The firewall script reads your firewall.config and then

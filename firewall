@@ -1,32 +1,10 @@
-#! /bin/sh
+#! /usr/bin/env sh
 # This script is part of Martin V\"ath's firewall scripts.
 # (C) Martin V\"ath <martin@mvath.de>
 
 # Configure variables:
 
-# "Push VAR args" will append args to a "pseudo-array" VAR.
-# "Push -c VAR args" will clear VAR in advance. args may be empty.
-Push() {
-	case ${1} in
-	-*)	shift
-		eval ${1}=;;
-	esac
-	PushD_=${1}
-	shift
-	eval "for PushA_
-	do	[ -z \"\${${PushD_}}\" ] && ${PushD_}=\\' \
-			|| ${PushD_}=\"\${${PushD_}} '\"
-		PushB_=\${PushA_}
-		while {
-			PushC_=\${PushB_%%\\'*}
-			[ \"\${PushC_}\" != \"\${PushB_}\" ]
-		}
-		do	${PushD_}=\"\${${PushD_}}\${PushC_}'\\\\''\"
-			PushB_=\${PushB_#*\\'}
-		done
-		${PushD_}=\"\${${PushD_}}\${PushB_}'\"
-	done"
-}
+. push.sh
 
 Echon() {
 	printf '%s' "${*}"
@@ -351,7 +329,7 @@ show|status)
 	Usage;;
 esac
 
-[ -n "${KNOCKSEQ}" ] || PORTKNOCK=false
+Push KNOCKSEQ || PORTKNOCK=false
 
 ListName() {
 	eval "[ -n \"\${${1}}\" ] && Echon --name \"\${${1}}\""
@@ -566,7 +544,7 @@ do	eval Tables -A OUTPUT -m owner --gid-owner \"\${i}\" `Log 'OUTPUT-phone'`
 	Tables -A OUTPUT -m owner --gid-owner "${i}" -j DROP
 done
 perm='OUTPUT'
-if [ -n "${OUTONLYCMD}" ] || [ -n "${OUTONLYUID}" ] || [ -n "${OUTONLYGID}" ]
+if Push OUTONLYCMD || Push OUTONLYUID || Push OUTONLYGID
 then	perm='permit'
 	Tables -N "${perm}"
 	eval "set -- ${OUTONLYCMD}"
@@ -875,9 +853,9 @@ for proto
 do	Tables -A INPUT -p "${proto}" -j DROP
 done
 
-if [ -n "${TRUSTEDPROTOCOL}" ]
+eval "set -- ${TRUSTEDPROTOCOL}"
+if [ ${#} -gt 0 ]
 then	Tables -N any_trst
-	eval "set -- ${TRUSTEDPROTOCOL}"
 	for proto
 	do	Tables -A any_trst -p "${proto}" -j ACCEPT
 	done
