@@ -332,15 +332,15 @@ esac
 Push KNOCKSEQ || PORTKNOCK=false
 
 ListName() {
-	eval "[ -n \"\${${1}}\" ] && Echon --name \"\${${1}}\""
+	eval "[ -n \"\${${1}:++}\" ] && Echon --name \"\${${1}}\""
 }
 
 KillMeVar() {
 	timeouts=`${2}`
 	eval timeoutvar=\${${3}}
-	${USETIMEOUT} && [ -n "${timeoutvar}" ] && [ "${timeoutvar}" -gt 0 ] \
+	${USETIMEOUT} && [ -n "${timeoutvar:++}" ] && [ "${timeoutvar}" -gt 0 ] \
 		|| timeoutvar=
-	if [ -n "${timeoutvar}" ]
+	if [ -n "${timeoutvar:++}" ]
 	then	timeouts='-m recent '`ListName "${4}"`" --set ${timeouts}"
 	fi
 	eval "${1}=\${timeouts}
@@ -633,7 +633,7 @@ eval Tables -A INPUT -d '127.0.0.0/24' ${mildly}
 Tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 KillMeTimeout() {
-	[ -z "${1}" ] || \
+	[ -z "${1:++}" ] || \
 	eval Tables -A INPUT -m recent `ListName ${2}` `${3}` --seconds \"\${1}\" `${4}`
 }
 KillMeTimeout "${NORMALTIMEOUT}" NORMALLIST CheckRecentNormal KillMeRecentNormal
