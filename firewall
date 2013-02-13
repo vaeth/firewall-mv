@@ -211,6 +211,11 @@ KillMeRecentSoftly() {
 	KillMeRecentMildly
 }
 
+# How to check for packet state. The up-to-date method is
+Push -c STATE -m conntrack --ctstate
+# If you have an ancient iptables you might need to use the obsolete method:
+#Push -c STATE -m state --state
+
 # Script for setting kernel variables:
 
 SYSCTL='sysctl.net'
@@ -507,8 +512,8 @@ eval "set -- 128.0.0.0/24 ${LOCALNETSOUT}"
 for i
 do	Tables -A OUTPUT -d "${i}" -j ACCEPT
 done
-eval Tables -A OUTPUT -m state --state INVALID `Log 'OUTPUT-invalid'`
-Tables -A OUTPUT -m state --state INVALID -j DROP
+eval Tables -A OUTPUT ${STATE} INVALID `Log 'OUTPUT-invalid'`
+eval Tables -A OUTPUT ${STATE} INVALID -j DROP
 
 # icmp handling of OUTPUT:
 
@@ -524,7 +529,7 @@ done
 Table4 -A OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
 Table6 -A OUTPUT -p icmpv6 --icmpv6-type destination-unreachable -j DROP
 Table6 -A OUTPUT -p icmpv6 -j ACCEPT
-Tables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+eval Tables -A OUTPUT ${STATE} ESTABLISHED,RELATED -j ACCEPT
 
 # Accept NEW output only if not from NOPHONE and in OUTONLY
 
@@ -562,7 +567,7 @@ then	perm='permit'
 	eval Tables -A OUTPUT `Log 'OUTPUT-nonmatch'`
 	#Tables -A OUTPUT -j DROP # is the Policy
 fi
-Tables -A "${perm}" -m state --state NEW -j ACCEPT
+eval Tables -A "${perm}" ${STATE} NEW -j ACCEPT
 eval Tables -A \"\${perm}\" `Log 'OUTPUT-error'`
 #Tables -A "${perm}" -j DROP # is the Policy
 
@@ -630,7 +635,7 @@ Tables -A lim_acc -j DROP
 Tables -A INPUT -i lo -j ACCEPT
 eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT-spoof'`
 eval Tables -A INPUT -d '127.0.0.0/24' ${mildly}
-Tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+eval Tables -A INPUT ${STATE} ESTABLISHED,RELATED -j ACCEPT
 
 KillMeTimeout() {
 	[ -z "${1:++}" ] || \
@@ -640,12 +645,12 @@ KillMeTimeout "${NORMALTIMEOUT}" NORMALLIST CheckRecentNormal KillMeRecentNormal
 KillMeTimeout "${MILDLYTIMEOUT}" MILDLYLIST CheckRecentMildly KillMeRecentMildly
 KillMeTimeout "${SOFTLYTIMEOUT}" SOFTLYLIST CheckRecentSoftly KillMeRecentSoftly
 
-eval Tables -A INPUT -m state --state INVALID `Log 'INPUT-invalid'`
-eval Tables -A INPUT -m state --state INVALID ${softly}
+eval Tables -A INPUT ${STATE} INVALID `Log 'INPUT-invalid'`
+eval Tables -A INPUT ${STATE} INVALID ${softly}
 #eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT-broadcast'`
 Tables -A INPUT -m pkttype --pkt-type broadcast ${GOTO} rej_drop
-eval Tables -A INPUT -p tcp '!' --syn -m state --state NEW `Log 'INPUT-strange'`
-eval Tables -A INPUT -p tcp '!' --syn -m state --state NEW ${softly}
+eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW `Log 'INPUT-strange'`
+eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW ${softly}
 if ${ROUTING}
 then	eval "set -- ${ROUTESOURCEIF}"
 	for i
