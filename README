@@ -18,6 +18,9 @@ firewall.config can also be copied into your /etc directory.
 You also need push.sh from http://github.com/vaeth/push in your path.
 
 Before you run firewall, please edit firewall.config to your needs.
+The example firewall.config sets the default based on the existence of some
+magic files in /etc. It assumes that the original eth* interfaces have been
+renamed to net* (e.g. by eudev or udev rules).
 
 The firewall script reads your firewall.config and then
 (by default) runs sysctl.net and initializes iptables according
