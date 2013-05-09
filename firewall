@@ -106,11 +106,11 @@ Push -c TRUSTEDIF
 # If you use this you should call on the clients something like
 #	route add -net default gw router-ip
 # and make sure that /etc/resolv.conf is set appropriately.
-# We assume that the original eth* interfaces have been renamed to net*
+# Our default supports eth* names as well as renames lan* or net*
 # (e.g. by eudev or udev rules); otherwise please change correspondingly
 
 ROUTING=false
-Push -c ROUTESOURCEIF 'net+'
+Push -c ROUTESOURCEIF 'eth+' 'lan+' 'net+'
 Push -c ROUTESOURCEIP '192.168.0.0/16'
 Push -c ROUTEDESTIF 'ppp+' 'ippp+' 'dsl+'
 
