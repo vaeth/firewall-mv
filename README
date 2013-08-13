@@ -30,6 +30,10 @@ sysctl.net initializes some net-related Linux sysctl variables.
 
 To get help, run firewall -h or sysctl.net -h, respectively.
 
+If you use systemd, you can copy the content of systemd into your systemd
+system folder and (after systemctl daemon-reload) enable the scripts with
+	systemctl enable firewall.service
+
 For openrc (the Gentoo init system) there are some scripts provided in
 the openrc folder. Copy these scripts and their configs to /etc/init.d
 or /etc/conf.d, respectively and edit /etc/conf.d.
