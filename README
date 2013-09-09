@@ -1,5 +1,6 @@
 (C) Martin Väth <martin@mvath.de>
-This project is under the BSD license.
+This project is under a BSD type license, meaning that you can do almost
+anything with it except removing my name.
 
 A collection of POSIX shell scripts to initialize iptables and
 net-related sysctl variables of Linux.
@@ -37,6 +38,10 @@ system folder and (after systemctl daemon-reload) enable the scripts with
 For openrc (the Gentoo init system) there are some scripts provided in
 the openrc folder. Copy these scripts and their configs to /etc/init.d
 or /etc/conf.d, respectively and edit /etc/conf.d.
+(Note that conf.d/modules conflicts with the original file from openrc.
+Instead of copying, you might want to add the last line of this file
+manually to your configuration: It is responsible for loading kernel
+modules as described below).
 To activate the firewall with openrc, call e.g.
 (the runlevels might depend on your configuration):
 	rc-config add fireclose boot
@@ -44,6 +49,11 @@ To activate the firewall with openrc, call e.g.
 Instead of adding fireclose to your boot runlevel, you might also want to
 add to your relevant /etc/conf.d/net* file(s):
 rc_need="fireclose"
+
+To load the required kernel modules with systemd or openrc copy e.g. the
+content of modules-load.d/ to /etc/modules-load.d/ or /usr/lib/modules-load.d/
+and edit it for your needs. Systemd automatically supports these directories,
+and for openrc the conf.d/modules file will take them into account.
 
 For Gentoo, there is an ebuild in the mv overlay (available by layman)
 which installs all files (but you still have to configure them).
