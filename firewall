@@ -1,4 +1,4 @@
-#! /usr/bin/env sh
+#!/usr/bin/env sh
 # This script is part of Martin V\"ath's firewall scripts.
 # (C) Martin V\"ath <martin@mvath.de>
 
@@ -235,7 +235,7 @@ Push -c SYSCTLCLOSE
 # Probably, this can also be -j for older iptables versions.
 GOTO='-g'
 
-# Do we use iptables, ipt6ables
+# Do we use iptables, ipt6ables?
 # (We die/warn if it is not available).
 IPT4=:
 IPT6=:
@@ -268,8 +268,13 @@ Die() {
 	exit 2
 }
 
+EchoCmd() {
+	Push -c echocmd "${@}"
+	Echo "${echocmd}"
+}
+
 EchoAndExec() {
-	Echo "${*}"
+	EchoCmd "${@}"
 	"${@}"
 }
 
@@ -284,8 +289,11 @@ Also ${SYSCTL} is called with configured arguments (except for \"show\")
 
 The following options are available:
 -k:   Skip calling ${SYSCTL}
+-1:   Execute every command separated with risk of race conditions
 -s:   Show which commands would be executed, but do not execute anything
+      Probably you will want to use this with -1
 -S:   Show command before executing it
+      Probably you will want to use this with -1
 -h:   Show this help and exit
 -p:   Enable  portknocking settings (default if configured)
 -P:   Disable portknocking settings
@@ -308,11 +316,14 @@ ip6 (currently, this script only supports blocking ip6 completely)."
 
 doexec=
 kernelset=:
+use_restore=:
 OPTIND=1
-while getopts 'ksSpPa:A:Hh?' opt
+while getopts '1ksSpPa:A:Hh?' opt
 do	case ${opt} in
+	1)	use_restore=false;;
 	k)	kernelset=false;;
-	s)	doexec='Echo';;
+	s)	doexec='EchoCmd'
+		PATH=${PATH}${PATH:+:}'/usr/local/sbin:/sbin:/usr/sbin';;
 	S)	doexec='EchoAndExec';;
 	p)	PORTKNOCK=false;;
 	P)	PORTKNOCK=:;;
@@ -325,18 +336,30 @@ shift $(( ${OPTIND} - 1 ))
 
 case ${1} in
 close)
+	use_restore=false
 	mode='close';;
 on|start)
 	mode='on';;
 off|stop)
+	use_restore=false
 	mode='off';;
 show|status)
+	use_restore=false
 	mode='show';;
 *)
 	Usage;;
 esac
 
 Push KNOCKSEQ || PORTKNOCK=false
+
+Dport() {
+	case ${1} in
+	*','*)
+		Push -c dport -m multiport --dports "${1}"
+		return;;
+	esac
+	Push -c dport --dport "${1}"
+}
 
 ListName() {
 	eval "[ -n \"\${${1}:++}\" ] && Echon --name \"\${${1}}\""
@@ -366,10 +389,91 @@ then	Die 'cannot find ip6tables'
 	IPT6=false
 fi
 
-eval "Table4() {
-	${doexec} iptables \"\${@}\"
+Replace() {
+	eval replace_tail=\${${1}}
+	replace_a=
+	while {
+		replace_b=${replace_tail%%"${2}"*}
+		[ "${replace_b}" != "${replace_tail}" ]
+	}
+	do	replace_a=${replace_a}${replace_b}${3}
+		replace_tail=${replace_tail#*"${2}"}
+	done
+	eval ${1}=\${replace_a}\${replace_tail}
 }
-Table6() {
+
+Quote() {
+	for quote
+	do	eval quoteres=\${${quote}}
+		Replace quoteres '\' '\\\\'
+		Replace quoteres '"' '\"'
+		case ${quoteres} in
+		*' '*)
+			quoteres='"'${quoteres}'"';;
+		esac
+		eval ${quote}=\${quoteres}
+	done
+}
+
+preparevars=
+Prepare() {
+	preparetable=filter
+	case ${1} in
+	-t)
+		preparetable=${2}
+		shift 2;;
+	esac
+	preparequote=Quote
+	case ${1} in
+	-[FXZ])
+		return;;
+	-[PN])
+		preparequote=:
+		set -- ":${2}" "${3:--}";;
+	-A)
+	esac
+	prepareres=
+	for preparei
+	do	preparer=${preparei}
+		${preparequote} preparer
+		prepareres=${prepareres}${prepareres:+ }${preparer}
+	done
+	preparevar=prepare_${preparetable}
+	eval prepareprev=\${${preparevar}}
+	if [ -z "${prepareprev}" ]
+	then	preparevars=${preparevars}${preparevars:+ }${preparevar}
+		prepareprev='*'${preparetable}
+	fi
+	prepareres=${prepareprev}'
+'${prepareres}
+	eval ${preparevar}=\${prepareres}
+}
+
+UnPrepare() {
+	${use_restore} || return 0
+	prepareres=
+	for preparei in ${preparevars}
+	do	eval prepareres=\${prepareres}\${$preparei}
+		prepareres=${prepareres}'
+COMMIT
+'
+	done
+	[ -z "${doexec}" ]|| {
+		Push -c i printf '%s\n' "${prepareres}"
+		Echo "${i} | \\"
+	}
+	Echo "${prepareres}" | ${doexec} iptables-restore
+}
+
+if ${use_restore}
+then	Table4() {
+	Prepare "${@}"
+}
+else	eval "Table4() {
+	${doexec} iptables \"\${@}\"
+}"
+fi
+eval "Table6() {
 	${doexec} ip6tables \"\${@}\"
 }"
 ${IPT4} || Table4() {
@@ -422,8 +526,7 @@ then	case ${mode} in
 	close)
 		eval "set -- ${SYSCTLCLOSE}";;
 	esac
-	${doexec} "${SYSCTL}" "${@}" \
-		|| Die "${SYSCTL} failed with status ${?}"
+	${doexec} "${SYSCTL}" "${@}" || Die "${SYSCTL} failed with status ${?}"
 fi
 
 # First the default (filter) tables:
@@ -469,8 +572,8 @@ close)
 	exit 0;;
 esac
 
-# This is currently a hack:
-# We execute no further ip6tables commands (i.e. IPv6 is always dropped)
+# This is currently a hack since this script has some functions which might
+# be extended later on to support IPv6. Currently we drop these functions:
 
 IPT6=false
 
@@ -593,7 +696,8 @@ MakeRejTable() {
 	[ ${#} -ge 1 ] || return
 	eval "set -- ${DROP_NOT_REJECT}"
 	for rejk
-	do	eval Tables -A \"\${rejc}\" -p \"\${rejp}\" --dport \"\${rejk}\" ${normal}
+	do	Dport "${rejk}"
+		eval Tables -A \"\${rejc}\" -p \"\${rejp}\" ${dport} ${normal}
 	done
 }
 
@@ -608,7 +712,7 @@ do	i="rej_${j}"
 		j=${REJECTTCP}
 		MakeRejTable "${i}" "${proto}" 1;;
 	udp)
-		j=${REJECTUCP}
+		j=${REJECTUDP}
 		MakeRejTable "${i}" "${proto}" 1;;
 	*)
 		j=${REJECTUNKNOWN}
@@ -692,7 +796,8 @@ done
 Tables -N tcp_trst
 eval "set -- ${TRUSTEDTCP}"
 for i
-do	Tables -A tcp_trst -p tcp --dport "${i}" -j ACCEPT
+do	Dport "${i}"
+	eval Tables -A tcp_trst -p tcp ${dport} -j ACCEPT
 done
 
 # UDP trusted
@@ -700,7 +805,8 @@ done
 Tables -N udp_trst
 eval "set -- ${TRUSTEDUDP}"
 for i
-do	Tables -A udp_trst -p udp --dport "${i}" -j ACCEPT
+do	Dport "${i}"
+	eval Tables -A udp_trst -p udp ${dport} -j ACCEPT
 done
 
 # Now the "main" chains for the three protocols:
@@ -733,7 +839,8 @@ RejectBadPorts() {
 	[ ${#} -ge 3 ] && badd=${3}
 	eval "set -- ${REJECT_TACITLY}"
 	for i
-	do	Tables -A "${badc}" -p "${badp}" --dport "${i}" ${GOTO} "${badd}"
+	do	Dport "${i}"
+		eval Tables -A \"\${badc}\" -p \"\${badp}\" ${dport} \${GOTO} \"\${badd}\"
 	done
 }
 
@@ -758,10 +865,12 @@ PortKnock() {
 	while [ ${knocki} -gt 1 ]
 	do	eval "knocka=\${${knocki}}"
 		knocki=$(( ${knocki} - 1 ))
-		eval Tables -A \"\${knockc}\" -p tcp --dport \"\${knocka}\" \
+		Dport "${knocka}"
+		eval Tables -A \"\${knockc}\" -p tcp ${dport} \
 			-m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` ${GOTO} goodknock
 	done
-	Tables -A "${knockc}" -p tcp --dport "${1}" ${GOTO} goodknock
+	Dport "${1}"
+	eval Tables -A \"\${knockc}\" -p tcp ${dport} \${GOTO} goodknock
 	Tables -A "${knockc}" -m recent --name KNOCK --remove
 	Tables -A "${knockc}" ${GOTO} "${knockd}"
 }
@@ -802,9 +911,11 @@ fi
 eval "set -- ${ALLOWTCP}"
 for i
 do	j=${i%/*}
+	Dport "${j}"
 	if [ "${j}" = "${i}" ]
-	then	Tables -A "${TCP_UNTRUSTED}" -p tcp --dport "${j}" -j ACCEPT
-	else	Tables -A "${TCP_UNTRUSTED}" -s "${i##*/}" -p tcp --dport "${j}" -j ACCEPT
+	then	eval Tables -A \"\${TCP_UNTRUSTED}\" -p tcp ${dport} -j ACCEPT
+	else	icut=${i##*/}
+		eval Tables -A \"\${TCP_UNTRUSTED}\" -s \"\${icut}\" -p tcp ${dport} -j ACCEPT
 	fi
 done
 RejectBadPorts "${TCP_UNTRUSTED}" tcp rej_tcp
@@ -818,9 +929,12 @@ eval "set -- ${ALLOWUDP}"
 for i
 do	case ${i} in
 	*/*)
-		Tables -A udp_in -s "${i##*/}" -p udp --dport "${i%/*}" -j ACCEPT;;
+		Dport "${i%/*}"
+		icut=${i##*/}
+		eval Tables -A udp_in -s \"\${icut}\" -p udp ${dport} -j ACCEPT;;
 	*)
-		Tables -A udp_in -p udp --dport "${i}" -j ACCEPT;;
+		Dport "${i}"
+		Tables -A udp_in -p udp ${dport} -j ACCEPT;;
 	esac
 done
 RejectBadPorts udp_in udp rej_udp
@@ -875,4 +989,5 @@ do	Tables -A INPUT -p "${proto}" -j ACCEPT
 done
 DefaultAction INPUT rej_drop 'unknown-protocol'
 
+UnPrepare
 exit 0

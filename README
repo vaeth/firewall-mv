@@ -10,11 +10,15 @@ optionally including a simple portknocking solution and router functionality.
 The usage is somewhat similar to SuSEfirewall2, but the approach has
 some essential differences. In particular, packets are usually not DROPed but
 REJECTed until a rate-limit is reached. It is not necessary to restart the
-firewall after a connection is established. The setting of the kernel variables
-is done with a separate script. Currently, IPv6 is not supported by the script.
+firewall after a connection is established.
+The setting of the kernel variables is done with a separate script.
+iptables-restore is used instead of iptables to avoid race conditions, see
+http://inai.de/documents/Perfect_Ruleset.pdf
+Currently, IPv6 is not supported.
 
 To install this project, copy the scripts into your path.
-firewall.config can also be copied into your /etc directory.
+firewall.config can also be copied into your /etc directory;
+for zsh completion support copy the content of zsh into you $fpath.
 
 You also need push.sh from http://github.com/vaeth/push in your path.
 

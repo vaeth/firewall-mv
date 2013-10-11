@@ -1,0 +1,28 @@
+#compdef firewall
+local context state state_descr line
+typeset -A opt_args
+_arguments -s -S -A '-*' : \
+'(1 -)'{'-h','-\\?'}'[help]' \
+'-k[skip calling sysctl.net]' \
+'(-S)-s[show only what would be executed]' \
+'(-s)-S[show before executing]' \
+'-1[execute commands separated]' \
+'-p[enable portknocking]' \
+'-P[disable portknocking]' \
+'-a+[PORT\[/ADDR\] allow new tcp]:port or port/addr:(22 22/192.168.0.99)' \
+'-A+[PORT\[/ADDR\] allow new udp]:port or port/addr:(4662\:4663 4662\:4663/192.168.0.99)' \
+'1:command:->cmds'
+local ret=$?
+case $state in
+cmds)
+	local cmds
+	cmds=(
+	{'on','start'}':switch filter rules on, normal operation'
+	{'off','stop'}':shut off all filter rules, allowing all traffic'
+	{'close','status'}':forbid anything to go in or out'
+	'show:show current filter rules'
+	)
+	_describe -t commands 'command' cmds
+	ret=$?;;
+esac
+return ret
