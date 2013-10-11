@@ -1,12 +1,13 @@
 [Unit]
-Description=The firewall (iptables) service from firewall-mv
-After=firewall-close.service syslog.target network.target auditd.service
+Description=firewall-mv (iptables)
+After=firewall-close.service syslog.target network.target auditd.service systemd-modules-load.service
+Conflicts=firewall-close.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/sbin/firewall on
-ExecStop=/sbin/firewall off
+ExecStop=/sbin/firewall close
 
 [Install]
 WantedBy=multi-user.target

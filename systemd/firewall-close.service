@@ -1,10 +1,13 @@
 [Unit]
-Description=Use firewall-mv to close all local firewalls
+Description=firewall-mv closes all local firewalls
 DefaultDependencies=no
+After=systemd-modules-load.service
 Before=network.target
+Conflicts=firewall.service
 
 [Service]
 Type=oneshot
+RemainAfterExit=yes
 ExecStart=/sbin/firewall close
 
 [Install]
