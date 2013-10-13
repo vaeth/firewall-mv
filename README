@@ -11,13 +11,20 @@ The usage is somewhat similar to SuSEfirewall2, but the approach has
 some essential differences. In particular, packets are usually not DROPed but
 REJECTed until a rate-limit is reached. It is not necessary to restart the
 firewall after a connection is established.
-The setting of the kernel variables is done with a separate script.
-iptables-restore is used instead of iptables to avoid race conditions, see
-http://inai.de/documents/Perfect_Ruleset.pdf
-Currently, IPv6 is not supported.
+Currently, IPv6 is practically not supported (except for closing everything).
 
-To install this project, copy the scripts into your path.
-firewall.config can also be copied into your /etc directory;
+The setting of the kernel variables is done with a separate script sysctl.net
+
+By default, firewall makes use of the functions from firewall-scripted.sh
+which allow a "scripted" use of iptables-restore and ip6tables-restore.
+This means that all iptables rules are created in one command.
+This has not only the advantage that it is much faster, but, moreover,
+it avoids race conditions when creating the rules,see
+http://inai.de/documents/Perfect_Ruleset.pdf
+See the instruction at the end how to use firewall-scripted.sh
+
+To install this project, copy the scripts from sbin/ into your path.
+etc/firewall.config can be copied into your path or into the /etc directory;
 for zsh completion support copy the content of zsh into you $fpath.
 
 You also need push.sh from http://github.com/vaeth/push in your path.
@@ -61,3 +68,33 @@ and for openrc the conf.d/modules file will take them into account.
 
 For Gentoo, there is an ebuild in the mv overlay (available by layman)
 which installs all files (but you still have to configure them).
+
+
+Instructions for firewall-scripted.sh:
+
+1.
+Source the script in a POSIX compliant shell with
+. firewall-scripted.sh
+All functions and variables used internally by firewall-scripted.sh have the
+form Fwmv[A-Z]* or fwmv_*, respectively, so do not use these.
+All these variables are cleaned up by firewall-scripted.sh when possible.
+
+2.
+Call "FwmvTable 4" or "FwmvTable 6" instead of "iptables" or "ip6tables",
+respectively. You can pass most options of iptables or ip6tables in exactly
+the same form; if you use the option -t, it must be the first one.
+
+3.
+When you are done, you can execute the "stored" commands in one step using
+"FwmvSet 4" or "FwmvSet 6", respectively.
+If you pass additionally the parameter "Echo" (possibly combined with "Exec"),
+the command is printed instead (and only executed if you also passed "Exec").
+In this case, firewall-scripted.sh requires the push.sh script (and uses
+the functions/variables used by push.sh in addition to those from Step 1.)
+
+4.
+After Step 3 all variables are reset so that you can start over with Step 2.
+
+Disclaimer: Not all options for FwmvTable in firewall-scripted.sh are tested;
+essentially only those used by the firewall script are tested.
+In particular, ip6tables is not tested at all with firewall-scripted.sh

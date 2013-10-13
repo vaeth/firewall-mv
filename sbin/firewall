@@ -389,89 +389,20 @@ then	Die 'cannot find ip6tables'
 	IPT6=false
 fi
 
-Replace() {
-	eval replace_tail=\${${1}}
-	replace_a=
-	while {
-		replace_b=${replace_tail%%"${2}"*}
-		[ "${replace_b}" != "${replace_tail}" ]
-	}
-	do	replace_a=${replace_a}${replace_b}${3}
-		replace_tail=${replace_tail#*"${2}"}
-	done
-	eval ${1}=\${replace_a}\${replace_tail}
-}
-
-Quote() {
-	for quote
-	do	eval quoteres=\${${quote}}
-		Replace quoteres '\' '\\\\'
-		Replace quoteres '"' '\"'
-		case ${quoteres} in
-		*' '*)
-			quoteres='"'${quoteres}'"';;
-		esac
-		eval ${quote}=\${quoteres}
-	done
-}
-
-preparevars=
-Prepare() {
-	preparetable=filter
-	case ${1} in
-	-t)
-		preparetable=${2}
-		shift 2;;
-	esac
-	preparequote=Quote
-	case ${1} in
-	-[FXZ])
-		return;;
-	-[PN])
-		preparequote=:
-		set -- ":${2}" "${3:--}";;
-	-A)
-	esac
-	prepareres=
-	for preparei
-	do	preparer=${preparei}
-		${preparequote} preparer
-		prepareres=${prepareres}${prepareres:+ }${preparer}
-	done
-	preparevar=prepare_${preparetable}
-	eval prepareprev=\${${preparevar}}
-	if [ -z "${prepareprev}" ]
-	then	preparevars=${preparevars}${preparevars:+ }${preparevar}
-		prepareprev='*'${preparetable}
-	fi
-	prepareres=${prepareprev}'
-'${prepareres}
-	eval ${preparevar}=\${prepareres}
-}
-
-UnPrepare() {
-	${use_restore} || return 0
-	prepareres=
-	for preparei in ${preparevars}
-	do	eval prepareres=\${prepareres}\${$preparei}
-		prepareres=${prepareres}'
-COMMIT
-'
-	done
-	[ -z "${doexec}" ]|| {
-		Push -c i printf '%s\n' "${prepareres}"
-		Echo "${i} | \\"
-	}
-	Echo "${prepareres}" | ${doexec} iptables-restore
-}
-
 if ${use_restore}
-then	Table4() {
-	Prepare "${@}"
+then	. firewall-scripted.sh
+	Table4() {
+	FwmvTable 4 "${@}"
+}
+	SetTables() {
+	FwmvSet 4 ${doexec}
 }
 else	eval "Table4() {
 	${doexec} iptables \"\${@}\"
 }"
+	SetTables() {
+	:
+}
 fi
 eval "Table6() {
 	${doexec} ip6tables \"\${@}\"
@@ -989,5 +920,4 @@ do	Tables -A INPUT -p "${proto}" -j ACCEPT
 done
 DefaultAction INPUT rej_drop 'unknown-protocol'
 
-UnPrepare
-exit 0
+! ${use_restore} || SetTables
