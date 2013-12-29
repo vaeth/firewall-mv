@@ -123,6 +123,10 @@ REJECTTCP='tcp-reset'
 REJECTUNKNOWN='icmp-proto-unreachable'
 REJECTUNKNOWNPROTO='icmp'
 
+# How to deal with broadcasts:
+# Allowed values are 'accept', 'accept-logging', 'drop', 'drop-logging'
+BROADCASTS='drop'
+
 # Always log with a rate limit:
 Log() {
 	Echon	-j LOG \
@@ -279,9 +283,10 @@ EchoAndExec() {
 }
 
 Usage() {
-	Echo "Usage: ${0##*/} [options] on|off|close|show
+	Echo "Usage: ${0##*/} [options] on|off|route|close|show
 on:     Switch filter rules on (normal start)
-off:    Shut off all filter rules (thus allowing all traffic)
+off:    Shut off all filter rules (thus allowing all traffic; do not route)
+route:  As off, but do route
 close:  Forbid *anything* to go in or out (e.g. during booting)
 show:   Show current filter rules
 
@@ -343,6 +348,9 @@ on|start)
 off|stop)
 	use_restore=false
 	mode='off';;
+route)
+	use_restore=false
+	mode='route';;
 show|status)
 	use_restore=false
 	mode='show';;
@@ -494,12 +502,13 @@ SwitchOff Table4 "${IP4TABLES}"
 SwitchOff Table6 "${IP6TABLES}"
 
 case ${mode} in
-off)
+off|route)
 	Tables -P INPUT ACCEPT
 	Tables -P FORWARD ACCEPT
-	Tables -P OUTPUT ACCEPT
-	exit 0;;
-close)
+	Tables -P OUTPUT ACCEPT;;
+esac
+case ${mode} in
+off|close)
 	exit 0;;
 esac
 
@@ -540,6 +549,10 @@ then	eval "set -- ${ROUTEDESTIF}"
 	done
 fi
 
+case ${mode} in
+route)
+	exit 0;;
+esac
 
 # OUTPUT:
 
@@ -684,8 +697,14 @@ KillMeTimeout "${SOFTLYTIMEOUT}" SOFTLYLIST CheckRecentSoftly KillMeRecentSoftly
 
 eval Tables -A INPUT ${STATE} INVALID `Log 'INPUT-invalid'`
 eval Tables -A INPUT ${STATE} INVALID ${softly}
-#eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT-broadcast'`
-Tables -A INPUT -m pkttype --pkt-type broadcast ${GOTO} rej_drop
+case ${BROADCASTS} in
+*[lL]*)
+	eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT-broadcast'`;;
+esac
+case ${BROADCASTS} in
+*[rRdD]*)
+	Tables -A INPUT -m pkttype --pkt-type broadcast ${GOTO} rej_drop;;
+esac
 eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW `Log 'INPUT-strange'`
 eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW ${softly}
 if ${ROUTING}
@@ -865,7 +884,7 @@ do	case ${i} in
 		eval Tables -A udp_in -s \"\${icut}\" -p udp ${dport} -j ACCEPT;;
 	*)
 		Dport "${i}"
-		Tables -A udp_in -p udp ${dport} -j ACCEPT;;
+		eval Tables -A udp_in -p udp ${dport} -j ACCEPT;;
 	esac
 done
 RejectBadPorts udp_in udp rej_udp

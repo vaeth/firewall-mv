@@ -18,7 +18,8 @@ cmds)
 	local cmds
 	cmds=(
 	{'on','start'}':switch filter rules on, normal operation'
-	{'off','stop'}':shut off all filter rules, allowing all traffic'
+	{'off','stop'}':shut off all filter rules, allowing all, no routing'
+	'route:shut off all filter rules, allowing all, routing'
 	{'close','status'}':forbid anything to go in or out'
 	'show:show current filter rules'
 	)
