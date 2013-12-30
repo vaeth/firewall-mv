@@ -59,7 +59,14 @@ Push -c DROP_PROTO 'igmp'
 # knocking sequence since otherwise the knocking host can get locked out
 # before he can complete the sequence.
 
-Push -c DROP_NOT_REJECT
+Push -c DROP_NOT_REJECT_NORMAL
+
+# As above, but do not lock out the addresses.
+# For instance, if you have windows machines in the local network and do
+# not want to lock out that machines but drop the annoying regular requests
+# you can list the ports here.
+
+Push -c DROP_NOT_REJECT_OK
 
 # Reject/Drop without logging those ports which are typically called
 # by learn-resistant programs (this saves a lot of log space)
@@ -165,7 +172,7 @@ LimAccept() {
 
 
 # DROP and lock this IP until it remains tacit for KILLMETIMEOUT seconds.
-# This is for the guys who have hit DROP_NOT_REJECT, tried spoofing,
+# This is for the guys who have hit DROP_NOT_REJECT_NORMAL, tried spoofing,
 # or have sent strange packets.
 # Note that using this feature might be dangerous since somebody can misuse it
 # to lock you out without much effort (if he can fake your IP); (you can still
@@ -638,7 +645,12 @@ MakeRejTable() {
 	Tables -N "${rejc}"
 	Tables -A rej_drop -p "${rejp}" ${GOTO} "${rejc}"
 	[ ${#} -ge 1 ] || return
-	eval "set -- ${DROP_NOT_REJECT}"
+	eval "set -- ${DROP_NOT_REJECT_OK}"
+	for rejk
+	do	Dport "${rejk}"
+		eval Tables -A \"\${rejc}\" -p \"\${rejp}\" ${dport} -j DROP
+	done
+	eval "set -- ${DROP_NOT_REJECT_NORMAL}"
 	for rejk
 	do	Dport "${rejk}"
 		eval Tables -A \"\${rejc}\" -p \"\${rejp}\" ${dport} ${normal}
