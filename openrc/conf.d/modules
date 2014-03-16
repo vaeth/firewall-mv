@@ -19,4 +19,4 @@
 #module_ieee1394_args_2_6="debug4"
 #module_ieee1394_args_2="debug5"
 
-modules=$(sed -n -e '/^[^;#]/p' /etc/modules-load.d/*.conf /usr/lib/modules-load.d/*.conf 2>/dev/null)
+modules=$(sed -n -e '/^[^;#]/p' /etc/modules-load.d/*.conf /usr/lib/modules-load.d/*.conf 2>/dev/null || : )
