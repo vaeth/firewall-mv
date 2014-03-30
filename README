@@ -29,7 +29,7 @@ you should modify firewall.config to your needs (for the defaults copy also
 etc/firewall.d to the /etc directory and follow etc/firewall.d/README).
 For zsh completion support copy the content of zsh into you $fpath.
 
-You also need push.sh from http://github.com/vaeth/push in your path.
+You also need push.sh from https://github.com/vaeth/push in your path.
 
 Before you run firewall, please edit firewall.config to your needs.
 The example firewall.config sets the default based on the existence of some
