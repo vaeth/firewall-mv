@@ -2,7 +2,7 @@
 Description=firewall-mv closes all local firewalls
 DefaultDependencies=no
 After=systemd-modules-load.service
-Before=network.target
+Before=network-pre.target
 Conflicts=firewall.service
 
 [Service]

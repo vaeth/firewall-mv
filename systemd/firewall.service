@@ -10,5 +10,5 @@ ExecStart=/sbin/firewall on
 ExecStop=/sbin/firewall close
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=network-online.target.wants
 Also=firewall-close.service
