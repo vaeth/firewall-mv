@@ -1,4 +1,4 @@
-#!/sbin/runscript
+#!/sbin/openrc-run
 # Martin V\"ath <martin@mvath.de>
 
 description='Start iptables based firewall to close all connections'
