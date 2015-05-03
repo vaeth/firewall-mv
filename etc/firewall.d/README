@@ -3,3 +3,4 @@ The default /etc/firewall.conf checks whether the following files exist:
 /etc/firewall.d/lan-trust      If this exists, lan is completely trusted
 /etc/firewall.d/routing        If this exists, routing is enabled
 /etc/firewall.d/dhcpdns-server If this exists, DHCP/DNS servers are allowed
+/etc/firewall.d/dhcp-server    If this exists, DHCP servers are allowed

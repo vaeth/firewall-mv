@@ -130,9 +130,9 @@ REJECTTCP='tcp-reset'
 REJECTUNKNOWN='icmp-proto-unreachable'
 REJECTUNKNOWNPROTO='icmp'
 
-# How to deal with broadcasts:
-# Allowed values are 'accept', 'accept-logging', 'drop', 'drop-logging'
-BROADCASTS='drop'
+# How to deal with broadcasts: Allowed values are
+# 'accept', 'accept-logging', 'drop', 'drop-logging', 'drop-unlimited'
+BROADCASTS='drop-unlimited'
 
 # Always log with a rate limit:
 Log() {
@@ -141,7 +141,7 @@ Log() {
 		--log-level warning \
 		--log-tcp-options \
 		--log-ip-options \
-		--log-prefix "'firewall-${1} '"
+		--log-prefix "'firewall ${1} '"
 }
 
 # Reject with a rate limit:
@@ -542,7 +542,7 @@ then	eval "set -- ${ROUTESOURCEIF}"
 		done
 	done
 fi
-eval Tables -A FORWARD `Log 'FORWARD-bad'`
+eval Tables -A FORWARD `Log 'FORWARD bad'`
 #Tables -A FORWARD -j DROP # is the policy
 
 # POSTROUTING:
@@ -568,14 +568,14 @@ eval "set -- 128.0.0.0/24 ${LOCALNETSOUT}"
 for i
 do	Tables -A OUTPUT -d "${i}" -j ACCEPT
 done
-eval Tables -A OUTPUT ${STATE} INVALID `Log 'OUTPUT-invalid'`
+eval Tables -A OUTPUT ${STATE} INVALID `Log 'OUTPUT invalid'`
 eval Tables -A OUTPUT ${STATE} INVALID -j DROP
 
 # icmp handling of OUTPUT:
 
-eval Table4 -A OUTPUT `Log 'OUTPUT-traceroute'` -p icmp --icmp-type time-exceeded
+eval Table4 -A OUTPUT `Log 'OUTPUT traceroute'` -p icmp --icmp-type time-exceeded
 Table4 -A OUTPUT -p icmp --icmp-type time-exceeded -j DROP
-eval Table6 -A OUTPUT `Log 'OUTPUT-traceroute'` -p icmpv6 --icmpv6-type time-exceeded
+eval Table6 -A OUTPUT `Log 'OUTPUT traceroute'` -p icmpv6 --icmpv6-type time-exceeded
 Table6 -A OUTPUT -p icmpv6 --icmpv6-type time-exceeded -j DROP
 eval "set -- fragmentation-needed network-prohibited host-prohibited communication-prohibited"
 for i
@@ -591,17 +591,17 @@ eval Tables -A OUTPUT ${STATE} ESTABLISHED,RELATED -j ACCEPT
 
 eval "set -- ${NOPHONECMD}"
 for i
-do	eval Tables -A OUTPUT -m owner --cmd-owner \"\${i}\" `Log 'OUTPUT-phone'`
+do	eval Tables -A OUTPUT -m owner --cmd-owner \"\${i}\" `Log 'OUTPUT phone'`
 	Tables -A OUTPUT -m owner --cmd-owner "${i}" -j DROP
 done
 eval "set -- ${NOPHONEUID}"
 for i
-do	eval Tables -A OUTPUT -m owner --uid-owner \"\${i}\" `Log 'OUTPUT-phone'`
+do	eval Tables -A OUTPUT -m owner --uid-owner \"\${i}\" `Log 'OUTPUT phone'`
 	Tables -A OUTPUT -m owner --uid-owner "${i}" -j DROP
 done
 eval "set -- ${NOPHONEGID}"
 for i
-do	eval Tables -A OUTPUT -m owner --gid-owner \"\${i}\" `Log 'OUTPUT-phone'`
+do	eval Tables -A OUTPUT -m owner --gid-owner \"\${i}\" `Log 'OUTPUT phone'`
 	Tables -A OUTPUT -m owner --gid-owner "${i}" -j DROP
 done
 perm='OUTPUT'
@@ -620,11 +620,11 @@ then	perm='permit'
 	for i
 	do	Tables -A OUTPUT -m owner --gid-owner "${i}" ${GOTO} "${perm}"
 	done
-	eval Tables -A OUTPUT `Log 'OUTPUT-nonmatch'`
+	eval Tables -A OUTPUT `Log 'OUTPUT nonmatch'`
 	#Tables -A OUTPUT -j DROP # is the Policy
 fi
 eval Tables -A "${perm}" ${STATE} NEW -j ACCEPT
-eval Tables -A \"\${perm}\" `Log 'OUTPUT-error'`
+eval Tables -A \"\${perm}\" `Log 'OUTPUT error'`
 #Tables -A "${perm}" -j DROP # is the Policy
 
 
@@ -662,15 +662,19 @@ do	i="rej_${j}"
 	proto=${j}
 	case ${proto} in
 	icmp)
+		msg='rej icmp limit'
 		j=${REJECTICMP}
 		MakeRejTable "${i}" "${proto}";;
 	tcp)
+		msg='rej tcp limit'
 		j=${REJECTTCP}
 		MakeRejTable "${i}" "${proto}" 1;;
 	udp)
+		msg='rej udp limit'
 		j=${REJECTUDP}
 		MakeRejTable "${i}" "${proto}" 1;;
 	*)
+		msg='rej strange limit'
 		j=${REJECTUNKNOWN}
 		proto=${REJECTUNKNOWNPROTO};;
 	esac
@@ -679,7 +683,7 @@ do	i="rej_${j}"
 	eval Tables -A \"\${i}\" -p \"\${proto}\" `Reject` --reject-with \"\${j}\"
 
 	# The limit is reached: We log (with a rate limit, of course) and drop:
-	eval Tables -A \"\${i}\" `Log 'reject-ratelimit'`
+	eval Tables -A \"\${i}\" `Log "${msg}"`
 	Tables -A "${i}" -j DROP
 done
 
@@ -688,14 +692,14 @@ done
 Tables -N lim_acc
 eval Tables -A lim_acc `LimAccept`
 # The limit is reached: We log (with a rate limit, of course) and drop
-eval Tables -A lim_acc `Log 'accept-ratelimit'`
+eval Tables -A lim_acc `Log 'acc limit'`
 Tables -A lim_acc -j DROP
 
 
 # INPUT:
 
 Tables -A INPUT -i lo -j ACCEPT
-eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT-spoof'`
+eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT spoof'`
 eval Tables -A INPUT -d '127.0.0.0/24' ${mildly}
 eval Tables -A INPUT ${STATE} ESTABLISHED,RELATED -j ACCEPT
 
@@ -707,17 +711,19 @@ KillMeTimeout "${NORMALTIMEOUT}" NORMALLIST CheckRecentNormal KillMeRecentNormal
 KillMeTimeout "${MILDLYTIMEOUT}" MILDLYLIST CheckRecentMildly KillMeRecentMildly
 KillMeTimeout "${SOFTLYTIMEOUT}" SOFTLYLIST CheckRecentSoftly KillMeRecentSoftly
 
-eval Tables -A INPUT ${STATE} INVALID `Log 'INPUT-invalid'`
+eval Tables -A INPUT ${STATE} INVALID `Log 'INPUT invalid'`
 eval Tables -A INPUT ${STATE} INVALID ${softly}
 case ${BROADCASTS} in
-*[lL]*)
-	eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT-broadcast'`;;
+*[lL][oO]*)
+	eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT broadcast'`;;
 esac
 case ${BROADCASTS} in
-*[rRdD]*)
+*[uU]*|[rRdR]*[lL][oO]*)
+	Tables -A INPUT -m pkttype --pkt-type broadcast -j DROP;;
+[rRdD]*)
 	Tables -A INPUT -m pkttype --pkt-type broadcast ${GOTO} rej_drop;;
 esac
-eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW `Log 'INPUT-strange'`
+eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW `Log 'INPUT strange'`
 eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW ${softly}
 if ${ROUTING}
 then	eval "set -- ${ROUTESOURCEIF}"
@@ -787,7 +793,7 @@ DestSpoof() {
 	spofc=${1}
 	eval "set -- ${LOCALNETSIN}"
 	for spofi
-	do	eval Tables -A \"\${spofc}\" -s \"\${spofi}\" `Log 'INPUT-spoof'`
+	do	eval Tables -A \"\${spofc}\" -s \"\${spofi}\" `Log 'INPUT spoof'`
 		eval Tables -A \"\${spofc}\" -s \"\${spofi}\" ${mildly}
 	done
 }
@@ -916,8 +922,8 @@ do	case ${proto} in
 	*)
 		inchain="${proto}_in";;
 	esac
-	DefaultAction "${inchain}" "rej_${proto}" "reject-${proto}"
-	DefaultAction "${proto}_trst" "rej_${proto}" "reject-trusted-${proto}"
+	DefaultAction "${inchain}" "rej_${proto}" "rej ${proto}"
+	DefaultAction "${proto}_trst" "rej_${proto}" "rej trust ${proto}"
 done
 
 # We will finish the same way for INPUT after protocol-selected jumps.
@@ -942,13 +948,13 @@ then	Tables -N any_trst
 	for proto
 	do	Tables -A any_trst -p "${proto}" -j ACCEPT
 	done
-	DefaultAction any_trst rej_drop 'unknown-protocol'
+	DefaultAction any_trst rej_drop 'rej unknown proto'
 	JumpTrusted INPUT any_trst
 fi
 eval "set -- ${ALLOWPROTOCOL}"
 for proto
 do	Tables -A INPUT -p "${proto}" -j ACCEPT
 done
-DefaultAction INPUT rej_drop 'unknown-protocol'
+DefaultAction INPUT rej_drop 'rej unknown proto'
 
 ! ${use_restore} || SetTables
