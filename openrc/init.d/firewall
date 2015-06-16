@@ -16,11 +16,11 @@ depend() {
 start() {
 	if yesno "${sysctl_on_start:-YES}"
 	then	ebegin "Starting sysctl.net and iptables based firewall"
-		firewall ${firewall_opts} on
+		firewall $firewall_opts on
 	else	ebegin "Starting iptables based firewall (without sysctl.net)"
-		firewall -k ${firewall_opts} on
+		firewall -k $firewall_opts on
 	fi
-	eend ${?}
+	eend $?
 }
 
 close() {
@@ -30,7 +30,7 @@ close() {
 	else	ebegin "Closing all connections (using iptables only)"
 		firewall -k close
 	fi
-	eend ${?}
+	eend $?
 }
 
 off() {
@@ -40,7 +40,7 @@ off() {
 	else	ebegin "Opening all connections (using iptables only)"
 		firewall -k off
 	fi
-	eend ${?}
+	eend $?
 }
 
 stop() {

@@ -9,7 +9,7 @@ The arguments may contain wildcards, e.g. *ppp*"
 	exit ${1:-1}
 }
 
-case ${1} in
+case $1 in
 -[hH?])
 	Usage 0;;
 -*)
@@ -17,26 +17,26 @@ case ${1} in
 esac
 
 SetIpx() {
-	! test -w "${2}" || {
-		printf '%s' "${1}" >"${2}"
+	! test -w "$2" || {
+		printf '%s' "$1" >"$2"
 	} 2>/dev/null
 }
 
 SetIface() {
-	test -d "${1}" || return
-	SetIpx 0 "${1}/accept_redirects"
-	SetIpx 0 "${1}/accept_source_route"
-	SetIpx 1 "${1}/rp_filter"
-	SetIpx 0 "${1}/mc_forwarding" # Not permitted
-	SetIpx 1 "${1}/log_martians"
-	SetIpx 0 "${1}/bootp_relay"
-	SetIpx ${2} "${1}/forwarding"
-	SetIpx 0 "${1}/proxy_arp"
-	SetIpx 1 "${1}/secure_redirects"
+	test -d "$1" || return
+	SetIpx 0 "$1/accept_redirects"
+	SetIpx 0 "$1/accept_source_route"
+	SetIpx 1 "$1/rp_filter"
+	SetIpx 0 "$1/mc_forwarding" # Not permitted
+	SetIpx 1 "$1/log_martians"
+	SetIpx 0 "$1/bootp_relay"
+	SetIpx $2 "$1/forwarding"
+	SetIpx 0 "$1/proxy_arp"
+	SetIpx 1 "$1/secure_redirects"
 }
 
 for i in ipv4 ipv6
-do	cd -- "/proc/sys/net/${i}" >/dev/null 2>&1 || continue
+do	cd -- "/proc/sys/net/$i" >/dev/null 2>&1 || continue
 	SetIpx 1 icmp_echo_ignore_broadcasts
 	SetIpx 0 icmp_echo_ignore_all
 	SetIpx 1 tcp_syncookies
@@ -53,22 +53,22 @@ do	cd -- "/proc/sys/net/${i}" >/dev/null 2>&1 || continue
 	SetIpx 1 route/flush
 	set +f
 	for j in conf/*
-	do	[ "${j}" = 'conf/*' ] && continue
-		SetIface "${j}" 0
+	do	[ "$j" = 'conf/*' ] && continue
+		SetIface "$j" 0
 	done
-	if [ ${#} -gt 0 ] && [ "${i}" = "ipv4" ]
+	if [ $# -gt 0 ] && [ "$i" = "ipv4" ]
 	then	SetIpx 1 ip_forward
 	else	SetIpx 0 ip_forward
 	fi
-	[ "${i}" = "ipv4" ] || continue
+	[ "$i" = "ipv4" ] || continue
 	cd -- 'conf' >/dev/null 2>&1 || continue
 	for j
-	do	if test -d "${j}"
-		then	SetIface "${j}" 1
+	do	if test -d "$j"
+		then	SetIface "$j" 1
 			continue
 		fi
-		for f in ${j}
-		do	test -d "${f}" && SetIface "${f}" 1
+		for f in $j
+		do	test -d "$f" && SetIface "$f" 1
 		done
 	done
 done

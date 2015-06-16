@@ -14,7 +14,7 @@ start() {
 	else	ebegin "Closing all connections (using iptables only)"
 		firewall -k close
 	fi
-	eend ${?}
+	eend $?
 }
 
 stop() {

@@ -61,7 +61,7 @@ To activate the firewall with openrc, call e.g.
 	rc-config add firewall default
 Instead of adding fireclose to your boot runlevel, you might also want to
 add to your relevant /etc/conf.d/net* file(s):
-rc_need="fireclose"
+rc_need=fireclose
 
 To load the required kernel modules with systemd or openrc copy e.g. the
 content of modules-load.d/ to /etc/modules-load.d/ or /usr/lib/modules-load.d/

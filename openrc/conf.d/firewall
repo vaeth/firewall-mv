@@ -1,17 +1,17 @@
 # /etc/conf.d/firewall: config file for /etc/init.d/firewall
 
 # Run sysctl.net on start/close/off  (otherwise -k is passed to firewall)
-sysctl_on_start="YES"
-sysctl_on_close="YES"
-sysctl_on_off="YES"
+sysctl_on_start=YES
+sysctl_on_close=YES
+sysctl_on_off=YES
 
 # Additional options for starting:
-firewall_opts=""
+firewall_opts=
 
 # Closing on stop is dangerous concerning the services we "need",
 # since shutting down that service might then cut off all connections:
 # Thus, enable only if you know what you are doing:
-close_on_stop="NO"
+close_on_stop=NO
 
 # When we need "net", we make sure that net is started before
-rc_need="net"
+rc_need=net

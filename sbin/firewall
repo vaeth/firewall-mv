@@ -7,7 +7,7 @@
 . push.sh
 
 Echon() {
-	printf '%s' "${*}"
+	printf '%s' "$*"
 }
 
 # Forbid output of certain commands, UIDs, or GIDs.
@@ -37,7 +37,7 @@ Push -c LOCALNETSOUT '192.168.0.0/16'
 
 Push -c LOCALNETSIN
 
-# A simple portknocking solution if PORTKNOCK is "true"(=":")
+# A simple portknocking solution if PORTKNOCK is "true" (or ":")
 # If the sequence KNOCKSEQ arrives on a tcp port, accept the last one.
 # Each knock must appear within KNOCKTIMEOUT seconds.
 # If KNOCKTIMEOUT is empty or 0, an infinite timeout is used.
@@ -141,7 +141,7 @@ Log() {
 		--log-level warning \
 		--log-tcp-options \
 		--log-ip-options \
-		--log-prefix "'firewall ${1} '"
+		--log-prefix "'firewall $1 '"
 }
 
 # Reject with a rate limit:
@@ -240,8 +240,8 @@ Push -c SYSCTLOFF
 Push -c SYSCTLCLOSE
 
 # In firewall.config you might want to have something like
-#! ${ROUTING} || Push SYSCTLON 'ppp*' 'ippp*' 'dsl*'
-#SYSCTLOFF=${SYSCTLON}
+#! $ROUTING || Push SYSCTLON 'ppp*' 'ippp*' 'dsl*'
+#SYSCTLOFF=$SYSCTLON
 
 # Probably, this can also be -j for older iptables versions.
 GOTO='-g'
@@ -263,30 +263,30 @@ fi
 set -f
 
 Echo() {
-	printf '%s\n' "${*}"
+	printf '%s\n' "$*"
 }
 
 Message() {
-	Echo "${0##*/}: ${*}" >&2
+	Echo "${0##*/}: $*" >&2
 }
 
 Warning() {
-	Message "warning: ${*}"
+	Message "warning: $*"
 }
 
 Die() {
-	Message "fatal: ${*}"
+	Message "fatal: $*"
 	exit 2
 }
 
 EchoCmd() {
-	Push -c echocmd "${@}"
-	Echo "${echocmd}"
+	Push -c echocmd "$@"
+	Echo "$echocmd"
 }
 
 EchoAndExec() {
-	EchoCmd "${@}"
-	"${@}"
+	EchoCmd "$@"
+	"$@"
 }
 
 Usage() {
@@ -297,10 +297,10 @@ route:  As off, but do route
 close:  Forbid *anything* to go in or out (e.g. during booting)
 show:   Show current filter rules
 
-Also ${SYSCTL} is called with configured arguments (except for \"show\")
+Also $SYSCTL is called with configured arguments (except for \"show\")
 
 The following options are available:
--k:   Skip calling ${SYSCTL}
+-k:   Skip calling $SYSCTL
 -1:   Execute every command separated with risk of race conditions
 -s:   Show which commands would be executed, but do not execute anything
       Probably you will want to use this with -1
@@ -331,22 +331,22 @@ kernelset=:
 use_restore=:
 OPTIND=1
 while getopts '1ksSpPa:A:Hh?' opt
-do	case ${opt} in
+do	case $opt in
 	1)	use_restore=false;;
 	k)	kernelset=false;;
 	s)	doexec='EchoCmd'
-		PATH=${PATH}${PATH:+:}'/usr/local/sbin:/sbin:/usr/sbin';;
+		PATH=$PATH${PATH:+:}'/usr/local/sbin:/sbin:/usr/sbin';;
 	S)	doexec='EchoAndExec';;
 	p)	PORTKNOCK=false;;
 	P)	PORTKNOCK=:;;
-	a)	Push ALLOWTCP "${OPTARG}";;
-	A)	Push ALLOWUDP "${OPTARG}";;
+	a)	Push ALLOWTCP "$OPTARG";;
+	A)	Push ALLOWUDP "$OPTARG";;
 	*)	Usage 0;;
 	esac
 done
-shift $(( ${OPTIND} - 1 ))
+shift $(( $OPTIND - 1 ))
 
-case ${1} in
+case $1 in
 close)
 	use_restore=false
 	mode='close';;
@@ -368,70 +368,70 @@ esac
 Push KNOCKSEQ || PORTKNOCK=false
 
 Dport() {
-	case ${1} in
+	case $1 in
 	*','*)
-		Push -c dport -m multiport --dports "${1}"
+		Push -c dport -m multiport --dports "$1"
 		return;;
 	esac
-	Push -c dport --dport "${1}"
+	Push -c dport --dport "$1"
 }
 
 ListName() {
-	eval "[ -n \"\${${1}:++}\" ] && Echon --name \"\${${1}}\""
+	eval "[ -n \"\${$1:++}\" ] && Echon --name \"\$$1\""
 }
 
 KillMeVar() {
-	timeouts=`${2}`
-	eval timeoutvar=\${${3}}
-	${USETIMEOUT} && [ -n "${timeoutvar:++}" ] && [ "${timeoutvar}" -gt 0 ] \
+	timeouts=`$2`
+	eval timeoutvar=\$$3
+	$USETIMEOUT && [ -n "${timeoutvar:++}" ] && [ "$timeoutvar" -gt 0 ] \
 		|| timeoutvar=
 	if [ -n "${timeoutvar:++}" ]
-	then	timeouts='-m recent '`ListName "${4}"`" --set ${timeouts}"
+	then	timeouts='-m recent '`ListName "$4"`" --set $timeouts"
 	fi
-	eval "${1}=\${timeouts}
-	${3}=\${timeoutvar}"
+	eval "$1=\$timeouts
+	$3=\$timeoutvar"
 }
 KillMeVar normal KillMeNormal NORMALTIMEOUT NORMALLIST
 KillMeVar mildly KillMeMildly MILDLYTIMEOUT MILDLYLIST
 KillMeVar softly KillMeSoftly SOFTLYTIMEOUT SOFTLYLIST
 
-if ${IPT4} && ! command -v iptables >/dev/null 2>&1
+if $IPT4 && ! command -v iptables >/dev/null 2>&1
 then	Die 'cannot find iptables'
 	IPT4=false
 fi
-if ${IPT6} && ! command -v ip6tables >/dev/null 2>&1
+if $IPT6 && ! command -v ip6tables >/dev/null 2>&1
 then	Die 'cannot find ip6tables'
 	IPT6=false
 fi
 
-if ${use_restore}
+if $use_restore
 then	. firewall-scripted.sh
 	Table4() {
-	FwmvTable 4 "${@}"
+	FwmvTable 4 "$@"
 }
 	SetTables() {
-	FwmvSet 4 ${doexec}
+	FwmvSet 4 $doexec
 }
 else	eval "Table4() {
-	${doexec} iptables \"\${@}\"
+	$doexec iptables \"\$@\"
 }"
 	SetTables() {
 	:
 }
 fi
 eval "Table6() {
-	${doexec} ip6tables \"\${@}\"
+	$doexec ip6tables \"\$@\"
 }"
-${IPT4} || Table4() {
+$IPT4 || Table4() {
 	:
 }
-${IPT6} || Table6() {
+$IPT6 || Table6() {
 	:
 }
 
 Tables() {
-	Table4 "${@}"
-	Table6 "${@}"
+	Table4 "$@"
+	Table6 "$@"
 }
 
 if test -r "/proc/net/ip_tables_names"
@@ -443,36 +443,36 @@ then	Push -c IP6TABLES `sort '/proc/net/ip6_tables_names'`
 else	Push -c IP6TABLES 'filter'
 fi
 
-if [ "${mode}" = 'show' ]
-then	PATH="/usr/lib/cw${PATH:+:}${PATH}"
+if [ "$mode" = 'show' ]
+then	PATH=/usr/lib/cw${PATH:+:}$PATH
 	print_separator=''
 PrintStat() {
-	prntc=${1}
-	prntp=${2}
-	eval "set -- ${3}"
+	prntc=$1
+	prntp=$2
+	eval "set -- $3"
 	for prnti
-	do	Echo "${print_separator}Table \"${prnti}\" (${prntp}):"
-		"${prntc}" -t "${prnti}" -nvL
+	do	Echo "${print_separator}Table \"$prnti\" ($prntp):"
+		"$prntc" -t "$prnti" -nvL
 		print_separator='
 
 '
 	done
 }
-	! ${IPT4} || PrintStat iptables "IPv4" "${IP4TABLES}"
-	! ${IPT6} || PrintStat ip6tables "IPv6" "${IP6TABLES}"
+	! $IPT4 || PrintStat iptables "IPv4" "$IP4TABLES"
+	! $IPT6 || PrintStat ip6tables "IPv6" "$IP6TABLES"
 	exit 0
 fi
 
-if ${kernelset}
-then	case ${mode} in
+if $kernelset
+then	case $mode in
 	on)
-		eval "set -- ${SYSCTLON}";;
+		eval "set -- $SYSCTLON";;
 	off)
-		eval "set -- ${SYSCTLOFF}";;
+		eval "set -- $SYSCTLOFF";;
 	close)
-		eval "set -- ${SYSCTLCLOSE}";;
+		eval "set -- $SYSCTLCLOSE";;
 	esac
-	${doexec} "${SYSCTL}" "${@}" || Die "${SYSCTL} failed with status ${?}"
+	$doexec "$SYSCTL" "$@" || Die "$SYSCTL failed with status $?"
 fi
 
 # First the default (filter) tables:
@@ -483,38 +483,38 @@ Tables -P OUTPUT  DROP
 Tables -F
 
 SwitchOff() {
-	swoffc=${1}
-	eval "set -- ${2}"
+	swoffc=$1
+	eval "set -- $2"
 	for swoffi
-	do	"${swoffc}" -t "${swoffi}" -F
-		"${swoffc}" -t "${swoffi}" -X
-		"${swoffc}" -t "${swoffi}" -Z
-		case ${swoffi} in
+	do	"$swoffc" -t "$swoffi" -F
+		"$swoffc" -t "$swoffi" -X
+		"$swoffc" -t "$swoffi" -Z
+		case $swoffi in
 		nat|mangle)
 			:;;
 		*)
 			continue;;
 		esac
-		"${swoffc}" -t "${swoffi}" -P PREROUTING ACCEPT
-		"${swoffc}" -t "${swoffi}" -P POSTROUTING ACCEPT
-		"${swoffc}" -t "${swoffi}" -P OUTPUT ACCEPT
-		if [ "${swoffi}" = 'mangle' ]
-		then	"${swoffc}" -t "${swoffi}" -P INPUT ACCEPT
-			"${swoffc}" -t "${swoffi}" -P FORWARD ACCEPT
+		"$swoffc" -t "$swoffi" -P PREROUTING ACCEPT
+		"$swoffc" -t "$swoffi" -P POSTROUTING ACCEPT
+		"$swoffc" -t "$swoffi" -P OUTPUT ACCEPT
+		if [ "$swoffi" = 'mangle' ]
+		then	"$swoffc" -t "$swoffi" -P INPUT ACCEPT
+			"$swoffc" -t "$swoffi" -P FORWARD ACCEPT
 		fi
 	done
 }
 
-SwitchOff Table4 "${IP4TABLES}"
-SwitchOff Table6 "${IP6TABLES}"
+SwitchOff Table4 "$IP4TABLES"
+SwitchOff Table6 "$IP6TABLES"
 
-case ${mode} in
+case $mode in
 off|route)
 	Tables -P INPUT ACCEPT
 	Tables -P FORWARD ACCEPT
 	Tables -P OUTPUT ACCEPT;;
 esac
-case ${mode} in
+case $mode in
 off|close)
 	exit 0;;
 esac
@@ -529,15 +529,15 @@ IPT6=false
 # FORWARD:
 
 Table4 -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-if ${ROUTING}
-then	eval "set -- ${ROUTESOURCEIF}"
+if $ROUTING
+then	eval "set -- $ROUTESOURCEIF"
 	for i
-	do	eval "set -- ${ROUTEDESTIF}"
+	do	eval "set -- $ROUTEDESTIF"
 		for j
-		do	eval "set -- ${ROUTESOURCEIP}"
+		do	eval "set -- $ROUTESOURCEIP"
 			for k
-			do	Table4 -A FORWARD -i "${i}" -o "${j}" -s "${k}" ! -d "${k}" -j ACCEPT
-				Table4 -A FORWARD -o "${i}" -i "${j}" -d "${k}" ! -s "${k}" -j ACCEPT
+			do	Table4 -A FORWARD -i "$i" -o "$j" -s "$k" ! -d "$k" -j ACCEPT
+				Table4 -A FORWARD -o "$i" -i "$j" -d "$k" ! -s "$k" -j ACCEPT
 			done
 		done
 	done
@@ -546,17 +546,17 @@ eval Tables -A FORWARD `Log 'FORWARD bad'`
 #Tables -A FORWARD -j DROP # is the policy
 
 # POSTROUTING:
-if ${ROUTING}
-then	eval "set -- ${ROUTEDESTIF}"
+if $ROUTING
+then	eval "set -- $ROUTEDESTIF"
 	for i
-	do	eval "set -- ${ROUTESOURCEIP}"
+	do	eval "set -- $ROUTESOURCEIP"
 		for j
-		do	Table4 -t nat -A POSTROUTING -o "${i}" -s "${j}" ! -d "${j}" -j MASQUERADE
+		do	Table4 -t nat -A POSTROUTING -o "$i" -s "$j" ! -d "$j" -j MASQUERADE
 		done
 	done
 fi
 
-case ${mode} in
+case $mode in
 route)
 	exit 0;;
 esac
@@ -564,12 +564,12 @@ esac
 # OUTPUT:
 
 Tables -A OUTPUT -o lo -j ACCEPT
-eval "set -- 128.0.0.0/24 ${LOCALNETSOUT}"
+eval "set -- 128.0.0.0/24 $LOCALNETSOUT"
 for i
-do	Tables -A OUTPUT -d "${i}" -j ACCEPT
+do	Tables -A OUTPUT -d "$i" -j ACCEPT
 done
-eval Tables -A OUTPUT ${STATE} INVALID `Log 'OUTPUT invalid'`
-eval Tables -A OUTPUT ${STATE} INVALID -j DROP
+eval Tables -A OUTPUT $STATE INVALID `Log 'OUTPUT invalid'`
+eval Tables -A OUTPUT $STATE INVALID -j DROP
 
 # icmp handling of OUTPUT:
 
@@ -579,53 +579,53 @@ eval Table6 -A OUTPUT `Log 'OUTPUT traceroute'` -p icmpv6 --icmpv6-type time-exc
 Table6 -A OUTPUT -p icmpv6 --icmpv6-type time-exceeded -j DROP
 eval "set -- fragmentation-needed network-prohibited host-prohibited communication-prohibited"
 for i
-do	Table4 -A OUTPUT -p icmp --icmp-type "${i}" -j ACCEPT
-	Table6 -A OUTPUT -p icmpv6 --icmpv6-type "${i}" -j ACCEPT
+do	Table4 -A OUTPUT -p icmp --icmp-type "$i" -j ACCEPT
+	Table6 -A OUTPUT -p icmpv6 --icmpv6-type "$i" -j ACCEPT
 done
 Table4 -A OUTPUT -p icmp --icmp-type destination-unreachable -j DROP
 Table6 -A OUTPUT -p icmpv6 --icmpv6-type destination-unreachable -j DROP
 Table6 -A OUTPUT -p icmpv6 -j ACCEPT
-eval Tables -A OUTPUT ${STATE} ESTABLISHED,RELATED -j ACCEPT
+eval Tables -A OUTPUT $STATE ESTABLISHED,RELATED -j ACCEPT
 
 # Accept NEW output only if not from NOPHONE and in OUTONLY
 
-eval "set -- ${NOPHONECMD}"
+eval "set -- $NOPHONECMD"
 for i
-do	eval Tables -A OUTPUT -m owner --cmd-owner \"\${i}\" `Log 'OUTPUT phone'`
-	Tables -A OUTPUT -m owner --cmd-owner "${i}" -j DROP
+do	eval Tables -A OUTPUT -m owner --cmd-owner \"\$i\" `Log 'OUTPUT phone'`
+	Tables -A OUTPUT -m owner --cmd-owner "$i" -j DROP
 done
-eval "set -- ${NOPHONEUID}"
+eval "set -- $NOPHONEUID"
 for i
-do	eval Tables -A OUTPUT -m owner --uid-owner \"\${i}\" `Log 'OUTPUT phone'`
-	Tables -A OUTPUT -m owner --uid-owner "${i}" -j DROP
+do	eval Tables -A OUTPUT -m owner --uid-owner \"\$i\" `Log 'OUTPUT phone'`
+	Tables -A OUTPUT -m owner --uid-owner "$i" -j DROP
 done
-eval "set -- ${NOPHONEGID}"
+eval "set -- $NOPHONEGID"
 for i
-do	eval Tables -A OUTPUT -m owner --gid-owner \"\${i}\" `Log 'OUTPUT phone'`
-	Tables -A OUTPUT -m owner --gid-owner "${i}" -j DROP
+do	eval Tables -A OUTPUT -m owner --gid-owner \"\$i\" `Log 'OUTPUT phone'`
+	Tables -A OUTPUT -m owner --gid-owner "$i" -j DROP
 done
 perm='OUTPUT'
 if Push OUTONLYCMD || Push OUTONLYUID || Push OUTONLYGID
 then	perm='permit'
-	Tables -N "${perm}"
-	eval "set -- ${OUTONLYCMD}"
+	Tables -N "$perm"
+	eval "set -- $OUTONLYCMD"
 	for i
-	do	Tables -A OUTPUT -m owner --cmd-owner "${i}" ${GOTO} "${perm}"
+	do	Tables -A OUTPUT -m owner --cmd-owner "$i" $GOTO "$perm"
 	done
-	eval "set -- ${OUTONLYUID}"
+	eval "set -- $OUTONLYUID"
 	for i
-	do	Tables -A OUTPUT -m owner --uid-owner "${i}" ${GOTO} "${perm}"
+	do	Tables -A OUTPUT -m owner --uid-owner "$i" $GOTO "$perm"
 	done
-	eval "set -- ${OUTONLYGID}"
+	eval "set -- $OUTONLYGID"
 	for i
-	do	Tables -A OUTPUT -m owner --gid-owner "${i}" ${GOTO} "${perm}"
+	do	Tables -A OUTPUT -m owner --gid-owner "$i" $GOTO "$perm"
 	done
 	eval Tables -A OUTPUT `Log 'OUTPUT nonmatch'`
 	#Tables -A OUTPUT -j DROP # is the Policy
 fi
-eval Tables -A "${perm}" ${STATE} NEW -j ACCEPT
-eval Tables -A \"\${perm}\" `Log 'OUTPUT error'`
-#Tables -A "${perm}" -j DROP # is the Policy
+eval Tables -A "$perm" $STATE NEW -j ACCEPT
+eval Tables -A \"\$perm\" `Log 'OUTPUT error'`
+#Tables -A "$perm" -j DROP # is the Policy
 
 
 # Before we build the INPUT chain, we create some auxiliary chains:
@@ -636,55 +636,55 @@ eval Tables -A \"\${perm}\" `Log 'OUTPUT error'`
 
 Tables -N rej_drop
 MakeRejTable() {
-	# create the rej_* (${1}) table and a protocol-tested (${2}) jump from rej_drop.
+	# create the rej_* ($1) table and a protocol-tested ($2) jump from rej_drop.
 	# If there is a third argument, then also drop those ports which
 	# should never be rejected in the rej_* table.
-	rejc=${1}
-	rejp=${2}
+	rejc=$1
+	rejp=$2
 	shift 2
-	Tables -N "${rejc}"
-	Tables -A rej_drop -p "${rejp}" ${GOTO} "${rejc}"
-	[ ${#} -ge 1 ] || return
-	eval "set -- ${DROP_NOT_REJECT_OK}"
+	Tables -N "$rejc"
+	Tables -A rej_drop -p "$rejp" $GOTO "$rejc"
+	[ $# -ge 1 ] || return
+	eval "set -- $DROP_NOT_REJECT_OK"
 	for rejk
-	do	Dport "${rejk}"
-		eval Tables -A \"\${rejc}\" -p \"\${rejp}\" ${dport} -j DROP
+	do	Dport "$rejk"
+		eval Tables -A \"\$rejc\" -p \"\$rejp\" $dport -j DROP
 	done
-	eval "set -- ${DROP_NOT_REJECT_NORMAL}"
+	eval "set -- $DROP_NOT_REJECT_NORMAL"
 	for rejk
-	do	Dport "${rejk}"
-		eval Tables -A \"\${rejc}\" -p \"\${rejp}\" ${dport} ${normal}
+	do	Dport "$rejk"
+		eval Tables -A \"\$rejc\" -p \"\$rejp\" $dport $normal
 	done
 }
 
 for j in icmp tcp udp drop
-do	i="rej_${j}"
-	proto=${j}
-	case ${proto} in
+do	i=rej_$j
+	proto=$j
+	case $proto in
 	icmp)
 		msg='rej icmp limit'
-		j=${REJECTICMP}
-		MakeRejTable "${i}" "${proto}";;
+		j=$REJECTICMP
+		MakeRejTable "$i" "$proto";;
 	tcp)
 		msg='rej tcp limit'
-		j=${REJECTTCP}
-		MakeRejTable "${i}" "${proto}" 1;;
+		j=$REJECTTCP
+		MakeRejTable "$i" "$proto" 1;;
 	udp)
 		msg='rej udp limit'
-		j=${REJECTUDP}
-		MakeRejTable "${i}" "${proto}" 1;;
+		j=$REJECTUDP
+		MakeRejTable "$i" "$proto" 1;;
 	*)
 		msg='rej strange limit'
-		j=${REJECTUNKNOWN}
-		proto=${REJECTUNKNOWNPROTO};;
+		j=$REJECTUNKNOWN
+		proto=$REJECTUNKNOWNPROTO;;
 	esac
 
 	# If the rate limit is not reached, we reject with the proper signal:
-	eval Tables -A \"\${i}\" -p \"\${proto}\" `Reject` --reject-with \"\${j}\"
+	eval Tables -A \"\$i\" -p \"\$proto\" `Reject` --reject-with \"\$j\"
 
 	# The limit is reached: We log (with a rate limit, of course) and drop:
-	eval Tables -A \"\${i}\" `Log "${msg}"`
-	Tables -A "${i}" -j DROP
+	eval Tables -A \"\$i\" `Log "$msg"`
+	Tables -A "$i" -j DROP
 done
 
 # The chain "lim_acc" accepts unless the rate limit is reached:
@@ -700,37 +700,37 @@ Tables -A lim_acc -j DROP
 
 Tables -A INPUT -i lo -j ACCEPT
 eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT spoof'`
-eval Tables -A INPUT -d '127.0.0.0/24' ${mildly}
-eval Tables -A INPUT ${STATE} ESTABLISHED,RELATED -j ACCEPT
+eval Tables -A INPUT -d '127.0.0.0/24' $mildly
+eval Tables -A INPUT $STATE ESTABLISHED,RELATED -j ACCEPT
 
 KillMeTimeout() {
 	[ -z "${1:++}" ] || \
-	eval Tables -A INPUT -m recent `ListName ${2}` `${3}` --seconds \"\${1}\" `${4}`
+	eval Tables -A INPUT -m recent `ListName $2` `$3` --seconds \"\$1\" `$4`
 }
-KillMeTimeout "${NORMALTIMEOUT}" NORMALLIST CheckRecentNormal KillMeRecentNormal
-KillMeTimeout "${MILDLYTIMEOUT}" MILDLYLIST CheckRecentMildly KillMeRecentMildly
-KillMeTimeout "${SOFTLYTIMEOUT}" SOFTLYLIST CheckRecentSoftly KillMeRecentSoftly
+KillMeTimeout "$NORMALTIMEOUT" NORMALLIST CheckRecentNormal KillMeRecentNormal
+KillMeTimeout "$MILDLYTIMEOUT" MILDLYLIST CheckRecentMildly KillMeRecentMildly
+KillMeTimeout "$SOFTLYTIMEOUT" SOFTLYLIST CheckRecentSoftly KillMeRecentSoftly
 
-eval Tables -A INPUT ${STATE} INVALID `Log 'INPUT invalid'`
-eval Tables -A INPUT ${STATE} INVALID ${softly}
-case ${BROADCASTS} in
+eval Tables -A INPUT $STATE INVALID `Log 'INPUT invalid'`
+eval Tables -A INPUT $STATE INVALID $softly
+case $BROADCASTS in
 *[lL][oO]*)
 	eval Tables -A INPUT -m pkttype --pkt-type broadcast `Log 'INPUT broadcast'`;;
 esac
-case ${BROADCASTS} in
+case $BROADCASTS in
 *[uU]*|[rRdR]*[lL][oO]*)
 	Tables -A INPUT -m pkttype --pkt-type broadcast -j DROP;;
 [rRdD]*)
-	Tables -A INPUT -m pkttype --pkt-type broadcast ${GOTO} rej_drop;;
+	Tables -A INPUT -m pkttype --pkt-type broadcast $GOTO rej_drop;;
 esac
-eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW `Log 'INPUT strange'`
-eval Tables -A INPUT -p tcp '!' --syn ${STATE} NEW ${softly}
-if ${ROUTING}
-then	eval "set -- ${ROUTESOURCEIF}"
+eval Tables -A INPUT -p tcp '!' --syn $STATE NEW `Log 'INPUT strange'`
+eval Tables -A INPUT -p tcp '!' --syn $STATE NEW $softly
+if $ROUTING
+then	eval "set -- $ROUTESOURCEIF"
 	for i
-	do	eval "set -- ${ROUTESOURCEIP}"
+	do	eval "set -- $ROUTESOURCEIP"
 		for j
-		do	Table4 -A INPUT -i "${i}" -s "${j}" ! -d "${j}" -j ACCEPT
+		do	Table4 -A INPUT -i "$i" -s "$j" ! -d "$j" -j ACCEPT
 		done
 	done
 fi
@@ -748,161 +748,161 @@ fi
 # ICMP trusted
 
 Tables -N icmp_trst
-eval "set -- ${TRUSTEDICMP}" "${ALLOWICMPLIMITED}" \
-	"${TRUSTEDICMP4}" "${ALLOWICMP4LIMITED}"
+eval "set -- $TRUSTEDICMP" "$ALLOWICMPLIMITED" \
+	"$TRUSTEDICMP4" "$ALLOWICMP4LIMITED"
 for i
-do	Table4 -A icmp_trst -p icmp --icmp-type "${i}" -j ACCEPT
+do	Table4 -A icmp_trst -p icmp --icmp-type "$i" -j ACCEPT
 done
-eval "set -- ${TRUSTEDICMP}" "${ALLOWICMPLIMITED}" \
-	"${TRUSTEDICMP6}" "${ALLOWICMP6LIMITED}"
+eval "set -- $TRUSTEDICMP" "$ALLOWICMPLIMITED" \
+	"$TRUSTEDICMP6" "$ALLOWICMP6LIMITED"
 for i
-do	Table6 -A icmp_trst -p icmp6 --icmp-type "${i}" -j ACCEPT
+do	Table6 -A icmp_trst -p icmp6 --icmp-type "$i" -j ACCEPT
 done
 
 # TCP trusted
 
 Tables -N tcp_trst
-eval "set -- ${TRUSTEDTCP}"
+eval "set -- $TRUSTEDTCP"
 for i
-do	Dport "${i}"
-	eval Tables -A tcp_trst -p tcp ${dport} -j ACCEPT
+do	Dport "$i"
+	eval Tables -A tcp_trst -p tcp $dport -j ACCEPT
 done
 
 # UDP trusted
 
 Tables -N udp_trst
-eval "set -- ${TRUSTEDUDP}"
+eval "set -- $TRUSTEDUDP"
 for i
-do	Dport "${i}"
-	eval Tables -A udp_trst -p udp ${dport} -j ACCEPT
+do	Dport "$i"
+	eval Tables -A udp_trst -p udp $dport -j ACCEPT
 done
 
 # Now the "main" chains for the three protocols:
 
 # This function defines the goto to the trusted (${1_trst}) chain:
 JumpTrusted() {
-	trustc=${1}
-	trustd=${2}
-	eval "set -- ${TRUSTEDIF}"
+	trustc=$1
+	trustd=$2
+	eval "set -- $TRUSTEDIF"
 	for i
-	do	Tables -A "${trustc}" -i "${i}" ${GOTO} "${trustd}"
+	do	Tables -A "$trustc" -i "$i" $GOTO "$trustd"
 	done
 }
 
 DestSpoof() {
-	spofc=${1}
-	eval "set -- ${LOCALNETSIN}"
+	spofc=$1
+	eval "set -- $LOCALNETSIN"
 	for spofi
-	do	eval Tables -A \"\${spofc}\" -s \"\${spofi}\" `Log 'INPUT spoof'`
-		eval Tables -A \"\${spofc}\" -s \"\${spofi}\" ${mildly}
+	do	eval Tables -A \"\$spofc\" -s \"\$spofi\" `Log 'INPUT spoof'`
+		eval Tables -A \"\$spofc\" -s \"\$spofi\" $mildly
 	done
 }
 
 # This function rejects tacitly (without logging) the "bad ports"
 # Arguments: chain, protocol, destination chain
 RejectBadPorts() {
-	badc=${1}
-	badp=${2}
+	badc=$1
+	badp=$2
 	badd='rej_drop'
-	[ ${#} -ge 3 ] && badd=${3}
-	eval "set -- ${REJECT_TACITLY}"
+	[ $# -ge 3 ] && badd=$3
+	eval "set -- $REJECT_TACITLY"
 	for i
-	do	Dport "${i}"
-		eval Tables -A \"\${badc}\" -p \"\${badp}\" ${dport} \${GOTO} \"\${badd}\"
+	do	Dport "$i"
+		eval Tables -A \"\$badc\" -p \"\$badp\" $dport \$GOTO \"\$badd\"
 	done
 }
 
 HitCount() {
-	[ ${1} -le 1 ] || Echon --hitcount ${1}
+	[ $1 -le 1 ] || Echon --hitcount $1
 }
 
 PortKnock() {
-	knockc=${1}
-	knockd=${2}
-	eval "set -- ${KNOCKSEQ}"
-	knocki=${#}
-	[ ${knocki} -eq 0 ] && return
-	[ -n "${KNOCKTIMEOUT}" ] && [ "${KNOCKTIMEOUT}" -gt 0 ] && \
-		tout='--seconds "${KNOCKTIMEOUT}"'
+	knockc=$1
+	knockd=$2
+	eval "set -- $KNOCKSEQ"
+	knocki=$#
+	[ $knocki -eq 0 ] && return
+	[ -n "$KNOCKTIMEOUT" ] && [ "$KNOCKTIMEOUT" -gt 0 ] && \
+		tout='--seconds "$KNOCKTIMEOUT"'
 	Tables -N goodknock
 	Tables -A goodknock -m recent --name KNOCK --set
-	${LOGKNOCKING} && Tables -A goodknock `Log 'knocking'`
-	eval Tables -A goodknock -m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` -j ACCEPT
-	Tables -A goodknock ${GOTO} "${knockd}"
+	$LOGKNOCKING && Tables -A goodknock `Log 'knocking'`
+	eval Tables -A goodknock -m recent --name KNOCK --rcheck $tout `HitCount $knocki` -j ACCEPT
+	Tables -A goodknock $GOTO "$knockd"
 
-	while [ ${knocki} -gt 1 ]
-	do	eval "knocka=\${${knocki}}"
-		knocki=$(( ${knocki} - 1 ))
-		Dport "${knocka}"
-		eval Tables -A \"\${knockc}\" -p tcp ${dport} \
-			-m recent --name KNOCK --rcheck ${tout} `HitCount ${knocki}` ${GOTO} goodknock
+	while [ $knocki -gt 1 ]
+	do	eval knocka=\$$knocki
+		knocki=$(( $knocki - 1 ))
+		Dport "$knocka"
+		eval Tables -A \"\$knockc\" -p tcp $dport \
+			-m recent --name KNOCK --rcheck $tout `HitCount $knocki` $GOTO goodknock
 	done
-	Dport "${1}"
-	eval Tables -A \"\${knockc}\" -p tcp ${dport} \${GOTO} goodknock
-	Tables -A "${knockc}" -m recent --name KNOCK --remove
-	Tables -A "${knockc}" ${GOTO} "${knockd}"
+	Dport "$1"
+	eval Tables -A \"\$knockc\" -p tcp $dport \$GOTO goodknock
+	Tables -A "$knockc" -m recent --name KNOCK --remove
+	Tables -A "$knockc" $GOTO "$knockd"
 }
 
 # ICMP
 
 Tables -N icmp_in
-eval "set -- ${ALLOWICMP}" "${ALLOWICMP4}"
+eval "set -- $ALLOWICMP" "$ALLOWICMP4"
 for i
-do	Table4 -A icmp_in -p icmp --icmp-type "${i}" -j ACCEPT
+do	Table4 -A icmp_in -p icmp --icmp-type "$i" -j ACCEPT
 done
-eval "set -- ${ALLOWICMP}" "${ALLOWICMP6}"
+eval "set -- $ALLOWICMP" "$ALLOWICMP6"
 for i
-do	Table6 -A icmp_in -p icmp6 --icmp-type "${i}" -j ACCEPT
+do	Table6 -A icmp_in -p icmp6 --icmp-type "$i" -j ACCEPT
 done
 JumpTrusted icmp_in icmp_trst
 DestSpoof icmp_in
-eval "set -- ${ALLOWICMPLIMITED}" "${ALLOWICMP4LIMITED}"
+eval "set -- $ALLOWICMPLIMITED" "$ALLOWICMP4LIMITED"
 for i
-do	Table4 -A icmp_in -p icmp --icmp-type "${i}" ${GOTO} lim_acc
+do	Table4 -A icmp_in -p icmp --icmp-type "$i" $GOTO lim_acc
 done
-eval "set -- ${ALLOWICMPLIMITED}" "${ALLOWICMP6LIMITED}"
+eval "set -- $ALLOWICMPLIMITED" "$ALLOWICMP6LIMITED"
 for i
-do	Table6 -A icmp_in -p icmp6 --icmp-type "${i}" ${GOTO} lim_acc
+do	Table6 -A icmp_in -p icmp6 --icmp-type "$i" $GOTO lim_acc
 done
 
 # TCP
 
 TCP_UNTRUSTED=tcp_in
-Tables -N "${TCP_UNTRUSTED}"
-JumpTrusted "${TCP_UNTRUSTED}" tcp_trst
-DestSpoof "${TCP_UNTRUSTED}"
-if ${PORTKNOCK}
+Tables -N "$TCP_UNTRUSTED"
+JumpTrusted "$TCP_UNTRUSTED" tcp_trst
+DestSpoof "$TCP_UNTRUSTED"
+if $PORTKNOCK
 then	TCP_UNTRUSTED=tcp_extern
-	Tables -N "${TCP_UNTRUSTED}"
-	PortKnock tcp_in "${TCP_UNTRUSTED}"
+	Tables -N "$TCP_UNTRUSTED"
+	PortKnock tcp_in "$TCP_UNTRUSTED"
 fi
-eval "set -- ${ALLOWTCP}"
+eval "set -- $ALLOWTCP"
 for i
 do	j=${i%/*}
-	Dport "${j}"
-	if [ "${j}" = "${i}" ]
-	then	eval Tables -A \"\${TCP_UNTRUSTED}\" -p tcp ${dport} -j ACCEPT
+	Dport "$j"
+	if [ "$j" = "$i" ]
+	then	eval Tables -A \"\$TCP_UNTRUSTED\" -p tcp $dport -j ACCEPT
 	else	icut=${i##*/}
-		eval Tables -A \"\${TCP_UNTRUSTED}\" -s \"\${icut}\" -p tcp ${dport} -j ACCEPT
+		eval Tables -A \"\$TCP_UNTRUSTED\" -s \"\$icut\" -p tcp $dport -j ACCEPT
 	fi
 done
-RejectBadPorts "${TCP_UNTRUSTED}" tcp rej_tcp
+RejectBadPorts "$TCP_UNTRUSTED" tcp rej_tcp
 
 # UDP
 
 Tables -N udp_in
 JumpTrusted udp_in udp_trst
 DestSpoof udp_in
-eval "set -- ${ALLOWUDP}"
+eval "set -- $ALLOWUDP"
 for i
-do	case ${i} in
+do	case $i in
 	*/*)
 		Dport "${i%/*}"
 		icut=${i##*/}
-		eval Tables -A udp_in -s \"\${icut}\" -p udp ${dport} -j ACCEPT;;
+		eval Tables -A udp_in -s \"\$icut\" -p udp $dport -j ACCEPT;;
 	*)
-		Dport "${i}"
-		eval Tables -A udp_in -p udp ${dport} -j ACCEPT;;
+		Dport "$i"
+		eval Tables -A udp_in -p udp $dport -j ACCEPT;;
 	esac
 done
 RejectBadPorts udp_in udp rej_udp
@@ -912,18 +912,18 @@ RejectBadPorts udp_in udp rej_udp
 # In all chains, we finish by the default action: logging and rejecting
 
 DefaultAction() {
-	eval Tables -A \"\${1}\" `Log "${3}"`
-	Tables -A "${1}" ${GOTO} "${2}"
+	eval Tables -A \"\$1\" `Log "$3"`
+	Tables -A "$1" $GOTO "$2"
 }
 for proto in icmp tcp udp
-do	case ${proto} in
+do	case $proto in
 	tcp)
-		inchain=${TCP_UNTRUSTED};;
+		inchain=$TCP_UNTRUSTED;;
 	*)
-		inchain="${proto}_in";;
+		inchain=${proto}_in;;
 	esac
-	DefaultAction "${inchain}" "rej_${proto}" "rej ${proto}"
-	DefaultAction "${proto}_trst" "rej_${proto}" "rej trust ${proto}"
+	DefaultAction "$inchain" "rej_$proto" "rej $proto"
+	DefaultAction "${proto}_trst" "rej_$proto" "rej trust $proto"
 done
 
 # We will finish the same way for INPUT after protocol-selected jumps.
@@ -933,28 +933,28 @@ done
 # executed - in this case, we should drop the packets and not send them
 # to some unfinished chain.
 
-Tables -A INPUT -p icmp ${GOTO} icmp_in
-Tables -A INPUT -p tcp ${GOTO} tcp_in
-Tables -A INPUT -p udp ${GOTO} udp_in
+Tables -A INPUT -p icmp $GOTO icmp_in
+Tables -A INPUT -p tcp $GOTO tcp_in
+Tables -A INPUT -p udp $GOTO udp_in
 
-eval "set -- ${DROP_PROTO}"
+eval "set -- $DROP_PROTO"
 for proto
-do	Tables -A INPUT -p "${proto}" -j DROP
+do	Tables -A INPUT -p "$proto" -j DROP
 done
 
-eval "set -- ${TRUSTEDPROTOCOL}"
-if [ ${#} -gt 0 ]
+eval "set -- $TRUSTEDPROTOCOL"
+if [ $# -gt 0 ]
 then	Tables -N any_trst
 	for proto
-	do	Tables -A any_trst -p "${proto}" -j ACCEPT
+	do	Tables -A any_trst -p "$proto" -j ACCEPT
 	done
 	DefaultAction any_trst rej_drop 'rej unknown proto'
 	JumpTrusted INPUT any_trst
 fi
-eval "set -- ${ALLOWPROTOCOL}"
+eval "set -- $ALLOWPROTOCOL"
 for proto
-do	Tables -A INPUT -p "${proto}" -j ACCEPT
+do	Tables -A INPUT -p "$proto" -j ACCEPT
 done
 DefaultAction INPUT rej_drop 'rej unknown proto'
 
-! ${use_restore} || SetTables
+! $use_restore || SetTables
