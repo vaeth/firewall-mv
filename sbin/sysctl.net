@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # This script is part of Martin V\"ath's firewall scripts.
 # (C) Martin V\"ath <martin@mvath.de>
-
+set -u
 Usage() {
 	printf '%s\n' \
 "Usage: ${0##*/} [interfaces on which forwarding should be enabled]
@@ -9,7 +9,7 @@ The arguments may contain wildcards, e.g. *ppp*"
 	exit ${1:-1}
 }
 
-case $1 in
+case ${1-} in
 -[hH?])
 	Usage 0;;
 -*)

@@ -2,13 +2,14 @@
 # This script is part of Martin V\"ath's firewall scripts.
 # (C) Martin V\"ath <martin@mvath.de>
 
-# Configure variables:
-
+set -u
 . push.sh
 
 Echon() {
 	printf '%s' "$*"
 }
+
+# Configure variables:
 
 # Forbid output of certain commands, UIDs, or GIDs.
 # Of course, this is not absolutely realiable but better than nothing to
@@ -346,7 +347,7 @@ do	case $opt in
 done
 shift $(( $OPTIND - 1 ))
 
-case $1 in
+case ${1-} in
 close)
 	use_restore=false
 	mode='close';;
