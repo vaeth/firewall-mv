@@ -96,6 +96,11 @@ Push -c ALLOWICMP6 'router-solicitation' 'router-advertisement' \
 Push -c ALLOWPROTOCOL
 Push -c ALLOWTCP
 Push -c ALLOWUDP
+Push -c ALLOWIF
+
+# Allow for Forward especially
+
+Push -c FORWARDALLOWIF
 
 # Allow for "trusted interfaces" in addition:
 
@@ -529,6 +534,10 @@ IPT6=false
 
 # FORWARD:
 
+eval "set -- $FORWARDALLOWIF"
+for i
+do	Tables -A FORWARD -i "$i" -j ACCEPT
+done
 Table4 -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 if $ROUTING
 then	eval "set -- $ROUTESOURCEIF"
@@ -703,6 +712,10 @@ Tables -A INPUT -i lo -j ACCEPT
 eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT spoof'`
 eval Tables -A INPUT -d '127.0.0.0/24' $mildly
 eval Tables -A INPUT $STATE ESTABLISHED,RELATED -j ACCEPT
+eval "set -- $ALLOWIF"
+for i
+do	Tables -A INPUT -i "$i" -j ACCEPT
+done
 
 KillMeTimeout() {
 	[ -z "${1:++}" ] || \

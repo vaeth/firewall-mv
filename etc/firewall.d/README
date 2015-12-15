@@ -4,3 +4,9 @@ The default /etc/firewall.conf checks whether the following files exist:
 /etc/firewall.d/routing        If this exists, routing is enabled
 /etc/firewall.d/dhcpdns-server If this exists, DHCP/DNS servers are allowed
 /etc/firewall.d/dhcp-server    If this exists, DHCP servers are allowed
+/etc/firewall.d/allow-tun      If this exists, allow tun devices (e.g. openvpn)
+/etc/firewall.d/allow-tap      If this exists, allow tap devices (e.g. openvpn)
+/etc/firewall.d/allowtcp       If it is a file, it is prepended to ALLOWTCP
+/etc/firewall.d/allowtcp.d/*   dito
+/etc/firewall.d/allowudp       If it is a file, it is prepended to ALLOWUDP
+/etc/firewall.d/allowudp.d/*   dito
