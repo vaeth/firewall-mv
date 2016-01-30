@@ -22,17 +22,19 @@ SetIpx() {
 	} 2>/dev/null
 }
 
+# Argument: 0/1 depending on whether forwarding is desired.
+# The original system's default is 0
 SetIface() {
 	test -d "$1" || return
 	SetIpx 0 "$1/accept_redirects"
 	SetIpx 0 "$1/accept_source_route"
 	SetIpx 1 "$1/rp_filter"
 	SetIpx 0 "$1/mc_forwarding" # Not permitted
-	SetIpx 1 "$1/log_martians"
+	SetIpx 1 "$1/log_martians" # The system's default is 0
 	SetIpx 0 "$1/bootp_relay"
 	SetIpx $2 "$1/forwarding"
 	SetIpx 0 "$1/proxy_arp"
-	SetIpx 1 "$1/secure_redirects"
+	SetIpx 1 "$1/secure_redirects" # The system's default is 0
 }
 
 for i in ipv4 ipv6
@@ -47,9 +49,13 @@ do	cd -- "/proc/sys/net/$i" >/dev/null 2>&1 || continue
 	SetIpx 5 icmp_destunreach_rate
 	SetIpx 5 icmp_paramprob_rate
 	SetIpx 6 icmp_timeexceed_rate
-	SetIpx 20 ipfrag_time
-	SetIpx 1 igmp_max_memberships
-	SetIpx "1024 61000" ip_local_port_range
+	SetIpx 30 ipfrag_time # default 30; SuSE set it to 20, causing problems
+	SetIpx 1 igmp_max_memberships # default is 20
+# According to http://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml
+# the ip_local_port_range is now officially "49152 65535"
+# The system's original default is "32768 61000"
+# Early systems had "1024 5000"; SuSE had "1024 61000"
+	SetIpx "49152 61000" ip_local_port_range
 	SetIpx 1 route/flush
 	set +f
 	for j in conf/*
