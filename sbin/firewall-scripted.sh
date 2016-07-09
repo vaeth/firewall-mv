@@ -62,7 +62,7 @@ FwmvTable() {
 	*' '$fwmv_v' '*)
 		eval fwmv_c=\$$fwmv_v;;
 	*)
-		$fwmv_s=$fwmv_s${fwmv_s:+\ }$fwmv_v
+		fwmv_s=$fwmv_s${fwmv_s:+\ }$fwmv_v
 		eval fwmv_table$fwmv_n=\$fwmv_s
 		fwmv_c='*'$fwmv_t;;
 	esac
