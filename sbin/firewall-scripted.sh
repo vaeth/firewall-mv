@@ -62,7 +62,8 @@ FwmvTable() {
 	*' '$fwmv_v' '*)
 		eval fwmv_c=\$$fwmv_v;;
 	*)
-		eval fwmv_table$fwmv_n='$fwmv_s${fwmv_s:+ }$fwmv_v'
+		$fwmv_s=$fwmv_s${fwmv_s:+\ }$fwmv_v
+		eval fwmv_table$fwmv_n=\$fwmv_s
 		fwmv_c='*'$fwmv_t;;
 	esac
 	fwmv_q=FwmvQuote
@@ -80,7 +81,7 @@ FwmvTable() {
 	for fwmv_i
 	do	fwmv_r=$fwmv_i
 		$fwmv_q fwmv_r
-		fwmv_x=$fwmv_x${fwmv_x:+ }$fwmv_r
+		fwmv_x=$fwmv_x${fwmv_x:+\ }$fwmv_r
 	done
 	[ -z "$fwmv_x" ] || fwmv_c=$fwmv_c'
 '$fwmv_x
