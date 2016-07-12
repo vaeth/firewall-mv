@@ -286,7 +286,7 @@ Die() {
 }
 
 EchoCmd() {
-	Push -c echocmd "$@"
+	Push -c echocmd ${1+"$@"}
 	Echo "$echocmd"
 }
 
@@ -449,13 +449,14 @@ then	Push -c IP6TABLES `sort '/proc/net/ip6_tables_names'`
 else	Push -c IP6TABLES 'filter'
 fi
 
-if [ "$mode" = 'show' ]
+if [ x"$mode" = x'show' ]
 then	PATH=/usr/lib/cw${PATH:+:}$PATH
 	print_separator=''
 PrintStat() {
 	prntc=$1
 	prntp=$2
-	eval "set -- $3"
+	eval "set -- a $3"
+	shift
 	for prnti
 	do	Echo "${print_separator}Table \"$prnti\" ($prntp):"
 		"$prntc" -t "$prnti" -nvL
@@ -472,13 +473,14 @@ fi
 if $kernelset
 then	case $mode in
 	on)
-		eval "set -- $SYSCTLON";;
+		eval "set -- a $SYSCTLON";;
 	off)
-		eval "set -- $SYSCTLOFF";;
+		eval "set -- a $SYSCTLOFF";;
 	close)
-		eval "set -- $SYSCTLCLOSE";;
+		eval "set -- a $SYSCTLCLOSE";;
 	esac
-	$doexec "$SYSCTL" "$@" || Die "$SYSCTL failed with status $?"
+	shift
+	$doexec "$SYSCTL" ${1+"$@"} || Die "$SYSCTL failed with status $?"
 fi
 
 # First the default (filter) tables:
@@ -490,7 +492,8 @@ Tables -F
 
 SwitchOff() {
 	swoffc=$1
-	eval "set -- $2"
+	eval "set -- a $2"
+	shift
 	for swoffi
 	do	"$swoffc" -t "$swoffi" -F
 		"$swoffc" -t "$swoffi" -X
@@ -504,7 +507,7 @@ SwitchOff() {
 		"$swoffc" -t "$swoffi" -P PREROUTING ACCEPT
 		"$swoffc" -t "$swoffi" -P POSTROUTING ACCEPT
 		"$swoffc" -t "$swoffi" -P OUTPUT ACCEPT
-		if [ "$swoffi" = 'mangle' ]
+		if [ x"$swoffi" = x'mangle' ]
 		then	"$swoffc" -t "$swoffi" -P INPUT ACCEPT
 			"$swoffc" -t "$swoffi" -P FORWARD ACCEPT
 		fi
@@ -534,17 +537,21 @@ IPT6=false
 
 # FORWARD:
 
-eval "set -- $FORWARDALLOWIF"
+eval "set -- a $FORWARDALLOWIF"
+shift
 for i
 do	Tables -A FORWARD -i "$i" -j ACCEPT
 done
 Table4 -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 if $ROUTING
-then	eval "set -- $ROUTESOURCEIF"
+then	eval "set -- a $ROUTESOURCEIF"
+	shift
 	for i
-	do	eval "set -- $ROUTEDESTIF"
+	do	eval "set -- a $ROUTEDESTIF"
+		shift
 		for j
-		do	eval "set -- $ROUTESOURCEIP"
+		do	eval "set -- a $ROUTESOURCEIP"
+			shift
 			for k
 			do	Table4 -A FORWARD -i "$i" -o "$j" -s "$k" ! -d "$k" -j ACCEPT
 				Table4 -A FORWARD -o "$i" -i "$j" -d "$k" ! -s "$k" -j ACCEPT
@@ -557,9 +564,11 @@ eval Tables -A FORWARD `Log 'FORWARD bad'`
 
 # POSTROUTING:
 if $ROUTING
-then	eval "set -- $ROUTEDESTIF"
+then	eval "set -- a $ROUTEDESTIF"
+	shift
 	for i
-	do	eval "set -- $ROUTESOURCEIP"
+	do	eval "set -- a $ROUTESOURCEIP"
+		shift
 		for j
 		do	Table4 -t nat -A POSTROUTING -o "$i" -s "$j" ! -d "$j" -j MASQUERADE
 		done
@@ -599,17 +608,20 @@ eval Tables -A OUTPUT $STATE ESTABLISHED,RELATED -j ACCEPT
 
 # Accept NEW output only if not from NOPHONE and in OUTONLY
 
-eval "set -- $NOPHONECMD"
+eval "set -- a $NOPHONECMD"
+shift
 for i
 do	eval Tables -A OUTPUT -m owner --cmd-owner \"\$i\" `Log 'OUTPUT phone'`
 	Tables -A OUTPUT -m owner --cmd-owner "$i" -j DROP
 done
-eval "set -- $NOPHONEUID"
+eval "set -- a $NOPHONEUID"
+shift
 for i
 do	eval Tables -A OUTPUT -m owner --uid-owner \"\$i\" `Log 'OUTPUT phone'`
 	Tables -A OUTPUT -m owner --uid-owner "$i" -j DROP
 done
-eval "set -- $NOPHONEGID"
+eval "set -- a $NOPHONEGID"
+shift
 for i
 do	eval Tables -A OUTPUT -m owner --gid-owner \"\$i\" `Log 'OUTPUT phone'`
 	Tables -A OUTPUT -m owner --gid-owner "$i" -j DROP
@@ -618,15 +630,18 @@ perm='OUTPUT'
 if Push OUTONLYCMD || Push OUTONLYUID || Push OUTONLYGID
 then	perm='permit'
 	Tables -N "$perm"
-	eval "set -- $OUTONLYCMD"
+	eval "set -- a $OUTONLYCMD"
+	shift
 	for i
 	do	Tables -A OUTPUT -m owner --cmd-owner "$i" $GOTO "$perm"
 	done
-	eval "set -- $OUTONLYUID"
+	eval "set -- a $OUTONLYUID"
+	shift
 	for i
 	do	Tables -A OUTPUT -m owner --uid-owner "$i" $GOTO "$perm"
 	done
-	eval "set -- $OUTONLYGID"
+	eval "set -- a $OUTONLYGID"
+	shift
 	for i
 	do	Tables -A OUTPUT -m owner --gid-owner "$i" $GOTO "$perm"
 	done
@@ -655,12 +670,14 @@ MakeRejTable() {
 	Tables -N "$rejc"
 	Tables -A rej_drop -p "$rejp" $GOTO "$rejc"
 	[ $# -ge 1 ] || return
-	eval "set -- $DROP_NOT_REJECT_OK"
+	eval "set -- a $DROP_NOT_REJECT_OK"
+	shift
 	for rejk
 	do	Dport "$rejk"
 		eval Tables -A \"\$rejc\" -p \"\$rejp\" $dport -j DROP
 	done
-	eval "set -- $DROP_NOT_REJECT_NORMAL"
+	eval "set -- a $DROP_NOT_REJECT_NORMAL"
+	shift
 	for rejk
 	do	Dport "$rejk"
 		eval Tables -A \"\$rejc\" -p \"\$rejp\" $dport $normal
@@ -712,7 +729,8 @@ Tables -A INPUT -i lo -j ACCEPT
 eval Tables -A INPUT -d '127.0.0.0/24' `Log 'INPUT spoof'`
 eval Tables -A INPUT -d '127.0.0.0/24' $mildly
 eval Tables -A INPUT $STATE ESTABLISHED,RELATED -j ACCEPT
-eval "set -- $ALLOWIF"
+eval "set -- a $ALLOWIF"
+shift
 for i
 do	Tables -A INPUT -i "$i" -j ACCEPT
 done
@@ -740,9 +758,11 @@ esac
 eval Tables -A INPUT -p tcp '!' --syn $STATE NEW `Log 'INPUT strange'`
 eval Tables -A INPUT -p tcp '!' --syn $STATE NEW $softly
 if $ROUTING
-then	eval "set -- $ROUTESOURCEIF"
+then	eval "set -- a $ROUTESOURCEIF"
+	shift
 	for i
-	do	eval "set -- $ROUTESOURCEIP"
+	do	eval "set -- a $ROUTESOURCEIP"
+		shift
 		for j
 		do	Table4 -A INPUT -i "$i" -s "$j" ! -d "$j" -j ACCEPT
 		done
@@ -762,13 +782,15 @@ fi
 # ICMP trusted
 
 Tables -N icmp_trst
-eval "set -- $TRUSTEDICMP" "$ALLOWICMPLIMITED" \
+eval "set -- a $TRUSTEDICMP" "$ALLOWICMPLIMITED" \
 	"$TRUSTEDICMP4" "$ALLOWICMP4LIMITED"
+shift
 for i
 do	Table4 -A icmp_trst -p icmp --icmp-type "$i" -j ACCEPT
 done
-eval "set -- $TRUSTEDICMP" "$ALLOWICMPLIMITED" \
+eval "set -- a $TRUSTEDICMP" "$ALLOWICMPLIMITED" \
 	"$TRUSTEDICMP6" "$ALLOWICMP6LIMITED"
+shift
 for i
 do	Table6 -A icmp_trst -p icmp6 --icmp-type "$i" -j ACCEPT
 done
@@ -776,7 +798,8 @@ done
 # TCP trusted
 
 Tables -N tcp_trst
-eval "set -- $TRUSTEDTCP"
+eval "set -- a $TRUSTEDTCP"
+shift
 for i
 do	Dport "$i"
 	eval Tables -A tcp_trst -p tcp $dport -j ACCEPT
@@ -785,7 +808,8 @@ done
 # UDP trusted
 
 Tables -N udp_trst
-eval "set -- $TRUSTEDUDP"
+eval "set -- a $TRUSTEDUDP"
+shift
 for i
 do	Dport "$i"
 	eval Tables -A udp_trst -p udp $dport -j ACCEPT
@@ -797,7 +821,8 @@ done
 JumpTrusted() {
 	trustc=$1
 	trustd=$2
-	eval "set -- $TRUSTEDIF"
+	eval "set -- a $TRUSTEDIF"
+	shift
 	for i
 	do	Tables -A "$trustc" -i "$i" $GOTO "$trustd"
 	done
@@ -805,7 +830,8 @@ JumpTrusted() {
 
 DestSpoof() {
 	spofc=$1
-	eval "set -- $LOCALNETSIN"
+	eval "set -- a $LOCALNETSIN"
+	shift
 	for spofi
 	do	eval Tables -A \"\$spofc\" -s \"\$spofi\" `Log 'INPUT spoof'`
 		eval Tables -A \"\$spofc\" -s \"\$spofi\" $mildly
@@ -819,7 +845,8 @@ RejectBadPorts() {
 	badp=$2
 	badd='rej_drop'
 	[ $# -ge 3 ] && badd=$3
-	eval "set -- $REJECT_TACITLY"
+	eval "set -- a $REJECT_TACITLY"
+	shift
 	for i
 	do	Dport "$i"
 		eval Tables -A \"\$badc\" -p \"\$badp\" $dport \$GOTO \"\$badd\"
@@ -833,7 +860,8 @@ HitCount() {
 PortKnock() {
 	knockc=$1
 	knockd=$2
-	eval "set -- $KNOCKSEQ"
+	eval "set -- a $KNOCKSEQ"
+	shift
 	knocki=$#
 	[ $knocki -eq 0 ] && return
 	[ -n "$KNOCKTIMEOUT" ] && [ "$KNOCKTIMEOUT" -gt 0 ] && \
@@ -860,21 +888,25 @@ PortKnock() {
 # ICMP
 
 Tables -N icmp_in
-eval "set -- $ALLOWICMP" "$ALLOWICMP4"
+eval "set -- a $ALLOWICMP" "$ALLOWICMP4"
+shift
 for i
 do	Table4 -A icmp_in -p icmp --icmp-type "$i" -j ACCEPT
 done
-eval "set -- $ALLOWICMP" "$ALLOWICMP6"
+eval "set -- a $ALLOWICMP" "$ALLOWICMP6"
+shift
 for i
 do	Table6 -A icmp_in -p icmp6 --icmp-type "$i" -j ACCEPT
 done
 JumpTrusted icmp_in icmp_trst
 DestSpoof icmp_in
-eval "set -- $ALLOWICMPLIMITED" "$ALLOWICMP4LIMITED"
+eval "set -- a $ALLOWICMPLIMITED" "$ALLOWICMP4LIMITED"
+shift
 for i
 do	Table4 -A icmp_in -p icmp --icmp-type "$i" $GOTO lim_acc
 done
-eval "set -- $ALLOWICMPLIMITED" "$ALLOWICMP6LIMITED"
+eval "set -- a $ALLOWICMPLIMITED" "$ALLOWICMP6LIMITED"
+shift
 for i
 do	Table6 -A icmp_in -p icmp6 --icmp-type "$i" $GOTO lim_acc
 done
@@ -890,11 +922,12 @@ then	TCP_UNTRUSTED=tcp_extern
 	Tables -N "$TCP_UNTRUSTED"
 	PortKnock tcp_in "$TCP_UNTRUSTED"
 fi
-eval "set -- $ALLOWTCP"
+eval "set -- a $ALLOWTCP"
+shift
 for i
 do	j=${i%/*}
 	Dport "$j"
-	if [ "$j" = "$i" ]
+	if [ x"$j" = x"$i" ]
 	then	eval Tables -A \"\$TCP_UNTRUSTED\" -p tcp $dport -j ACCEPT
 	else	icut=${i##*/}
 		eval Tables -A \"\$TCP_UNTRUSTED\" -s \"\$icut\" -p tcp $dport -j ACCEPT
@@ -907,7 +940,8 @@ RejectBadPorts "$TCP_UNTRUSTED" tcp rej_tcp
 Tables -N udp_in
 JumpTrusted udp_in udp_trst
 DestSpoof udp_in
-eval "set -- $ALLOWUDP"
+eval "set -- a $ALLOWUDP"
+shift
 for i
 do	case $i in
 	*/*)
@@ -951,12 +985,14 @@ Tables -A INPUT -p icmp $GOTO icmp_in
 Tables -A INPUT -p tcp $GOTO tcp_in
 Tables -A INPUT -p udp $GOTO udp_in
 
-eval "set -- $DROP_PROTO"
+eval "set -- a $DROP_PROTO"
+shift
 for proto
 do	Tables -A INPUT -p "$proto" -j DROP
 done
 
-eval "set -- $TRUSTEDPROTOCOL"
+eval "set -- a $TRUSTEDPROTOCOL"
+shift
 if [ $# -gt 0 ]
 then	Tables -N any_trst
 	for proto
@@ -965,7 +1001,8 @@ then	Tables -N any_trst
 	DefaultAction any_trst rej_drop 'rej unknown proto'
 	JumpTrusted INPUT any_trst
 fi
-eval "set -- $ALLOWPROTOCOL"
+eval "set -- a $ALLOWPROTOCOL"
+shift
 for proto
 do	Tables -A INPUT -p "$proto" -j ACCEPT
 done

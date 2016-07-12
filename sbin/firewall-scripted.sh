@@ -3,9 +3,7 @@
 # (C) Martin V\"ath <martin@mvath.de>
 
 FwmvPush() {
-	fwmv_P=`command -v Push 2>/dev/null` && [ "$fwmv_P" = Push ] \
-		|| . push.sh
-	unset fwmv_P
+	command -v Push 2>/dev/null || . push.sh
 FwmvPush() {
 	Push "$@"
 }
@@ -17,7 +15,7 @@ FwmvReplace() {
 	fwmv_A=
 	while {
 		fwmv_B=${fwmv_T%%"$2"*}
-		[ "$fwmv_B" != "$fwmv_T" ]
+		[ x"$fwmv_B" != x"$fwmv_T" ]
 	}
 	do	fwmv_A=$fwmv_A$fwmv_B$3
 		fwmv_T=${fwmv_T#*"$2"}
@@ -69,13 +67,16 @@ FwmvTable() {
 	fwmv_q=FwmvQuote
 	case ${1:-} in
 	-[FXZ])
-		set --;;
+		set -- a
+		shift;;
 	-[PN])
 		fwmv_q=:
-		set -- ":$2" "${3:--}";;
+		set -- a ":$2" "${3:--}"
+		shift;;
 	-[PN]*)
 		fwmv_q=:
-		set -- ":${1#?}" "${2:--}";;
+		set -- a ":${1#?}" "${2:--}"
+		shift;;
 	esac
 	fwmv_x=
 	for fwmv_i
@@ -104,7 +105,7 @@ COMMIT
 '
 	done
 	if [ -n "$fwmv_x" ]
-	then	[ "$fwmv_n" = 4 ] && fwmv_n=
+	then	[ x"$fwmv_n" = x'4' ] && fwmv_n=
 		case $* in
 		*cho*|*rint*|*rnt*)
 			FwmvPush -c fwmv_s printf '%s' "$fwmv_x"
