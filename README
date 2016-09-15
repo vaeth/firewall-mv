@@ -65,11 +65,10 @@ rc_need=fireclose
 
 To load the required kernel modules with systemd or openrc, copy e.g. the
 content of modules-load.d/ to /etc/modules-load.d/ or /usr/lib/modules-load.d/
-and edit it for your needs. Systemd and >openrc-0.21.5 automatically support
-these directories (formally, openrc-0.21.4 and openrc-0.21.5 also support it
-but contain a serious typo, see https://github.com/OpenRC/openrc/pull/96).
-For older versions of openrc you can use the conf.d/modules file to take the
-directories into account in a somewhat hackish manner.
+and edit it for your needs.
+Systemd and openrc-0.21.7 (or newer) automatically support these directories.
+For older versions of openrc, you can use the conf.d/modules file to get
+at least some rudimentary support of these directories.
 
 For Gentoo, there is an ebuild in the mv overlay (available by layman)
 which installs all files (but you still have to configure them).
