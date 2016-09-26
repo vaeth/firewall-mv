@@ -336,7 +336,7 @@ doexec=
 kernelset=:
 use_restore=:
 OPTIND=1
-while getopts '1ksSpPa:A:Hh?' opt
+while getopts '1ksSpPa:A:Hh' opt
 do	case $opt in
 	1)	use_restore=false;;
 	k)	kernelset=false;;
@@ -347,6 +347,7 @@ do	case $opt in
 	P)	PORTKNOCK=:;;
 	a)	Push ALLOWTCP "$OPTARG";;
 	A)	Push ALLOWUDP "$OPTARG";;
+	'?')	exit 1;;
 	*)	Usage 0;;
 	esac
 done
