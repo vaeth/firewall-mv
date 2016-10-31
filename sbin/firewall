@@ -3,7 +3,13 @@
 # (C) Martin V\"ath <martin@mvath.de>
 
 set -u
-. push.sh
+
+if PushA_=`push.sh 2>/dev/null`
+then	eval "$PushA_"
+else	echo "push.sh from https://github.com/vaeth/push (v2.0 or newer) required" >&2
+	exit 1
+fi
+
 
 Echon() {
 	printf '%s' "$*"
@@ -412,7 +418,11 @@ then	Die 'cannot find ip6tables'
 fi
 
 if $use_restore
-then	. firewall-scripted.sh
+then	if firewall_scripted=`push.sh 2>/dev/null`
+	then	eval "$firewall_scripted"
+	else	echo "firewall-scripted.sh (v10.0 or newer) required" >&2
+		exit 1
+	fi
 	Table4() {
 	FwmvTable 4 "$@"
 }

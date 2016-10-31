@@ -29,7 +29,8 @@ you should modify firewall.config to your needs (for the defaults copy also
 etc/firewall.d to the /etc directory and follow etc/firewall.d/README).
 For zsh completion support copy the content of zsh into you $fpath.
 
-You also need push.sh from https://github.com/vaeth/push in your path.
+You also need push.sh from https://github.com/vaeth/push (v2.0 or newer)
+in your path.
 
 Before you run firewall, please edit firewall.config to your needs.
 The example firewall.config sets the default based on the existence of some
@@ -77,8 +78,20 @@ which installs all files (but you still have to configure them).
 Instructions for firewall-scripted.sh:
 
 1.
-Source the script in a POSIX compliant shell with
+Evaluate the output of firewall-scripted.sh in a POSIX compliant shell, e.g.
+
+if SOME_VARIABLE=`firewall-scripted.sh 2>/dev/null`
+then	eval "$SOME_VARIABLE"
+else	echo "firewall-scripted.sh not installed" >&2
+fi
+
+Alternatively you can also source:
+
 . firewall-scripted.sh
+
+but the latter has the disadvantage that your script will just stop if
+firewall-scripted.sh is not available.
+
 All functions and variables used internally by firewall-scripted.sh have the
 form Fwmv[A-Z]* or fwmv_*, respectively, so do not use these.
 All these variables are cleaned up by firewall-scripted.sh when possible.

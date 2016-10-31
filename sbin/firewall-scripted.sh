@@ -1,9 +1,12 @@
-#!/bin/sh  This line is only for editors; this sript must be sourced
+#!/usr/bin/env cat
 # This script is part of Martin V\"ath's firewall scripts.
 # (C) Martin V\"ath <martin@mvath.de>
 
 FwmvPush() {
-	command -v Push 2>/dev/null || . push.sh
+	command -v Push 2>/dev/null || if PushA_=`push.sh 2>/dev/null`
+	then	eval "$PushA_"
+	else	echo "push.sh from https://github.com/vaeth/push (v2.0 or newer) required" >&2
+	fi
 FwmvPush() {
 	Push "$@"
 }
