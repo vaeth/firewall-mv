@@ -418,7 +418,7 @@ then	Die 'cannot find ip6tables'
 fi
 
 if $use_restore
-then	if firewall_scripted=`push.sh 2>/dev/null`
+then	if firewall_scripted=`firewall-scripted.sh 2>/dev/null`
 	then	eval "$firewall_scripted"
 	else	echo "firewall-scripted.sh (v10.0 or newer) required" >&2
 		exit 1
