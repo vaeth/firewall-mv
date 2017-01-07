@@ -23,7 +23,6 @@ cmds)
 	{'close','status'}':forbid anything to go in or out'
 	'show:show current filter rules'
 	)
-	_describe -t commands 'command' cmds
-	ret=$?;;
+	_describe -t commands 'command' cmds && ret=0;;
 esac
 return ret
