@@ -267,10 +267,15 @@ IPT6=:
 # Usually, you will only use this to modify the above array variables or
 # functions so that certain services will not be blocked.
 
-if test -r /etc/firewall.config
-then	. /etc/firewall.config
-else	. firewall.config
-fi
+for source_file in \
+	/etc/firewall.config \
+	/usr/lib/firewall/firewall.config \
+	/lib/firewall/firewall.config
+do	test -r "$source_file" || continue
+	test -d "$source_file" && continue
+	! test -f "$source_file" || . "$source_file"
+	break
+done
 
 set -f
 

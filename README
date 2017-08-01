@@ -24,8 +24,10 @@ http://inai.de/documents/Perfect_Ruleset.pdf
 See the instruction at the end how to use firewall-scripted.sh
 
 To install this project, copy the scripts from sbin/ into your path.
-etc/firewall.config can be copied into your path or into the /etc directory:
-you should modify firewall.config to your needs (for the defaults copy also
+etc/firewall.config can be copied into /etc or /usr/lib/firewall or
+/lib/firewall (if it is readable in a former directory, it is used;
+thus, the latter can be used to provide distribution-wide defaults).
+You should modify firewall.config to your needs (for the default, copy
 etc/firewall.d to the /etc directory and follow etc/firewall.d/README).
 For zsh completion support copy the content of zsh into you $fpath.
 
