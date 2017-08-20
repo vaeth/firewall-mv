@@ -23,7 +23,8 @@ it avoids race conditions when creating the rules,see
 http://inai.de/documents/Perfect_Ruleset.pdf
 See the instruction at the end how to use firewall-scripted.sh
 
-To install this project, copy the scripts from sbin/ into your path.
+To install this project easily, run make (and "make install" as root).
+For manual installation, copy the scripts from sbin/ into your path.
 etc/firewall.config can be copied into /etc or /usr/lib/firewall or
 /lib/firewall (if it is readable in a former directory, it is used;
 thus, the latter can be used to provide distribution-wide defaults).
@@ -34,7 +35,9 @@ For zsh completion support copy the content of zsh into you $fpath.
 You also need push.sh from https://github.com/vaeth/push (v2.0 or newer)
 in your path.
 
-Before you run firewall, please edit firewall.config to your needs.
+Before you run firewall, please edit firewall.config to your needs:
+You have to create it in /etc/firewall.config to override the sample default
+from /usr/lib/firewall or /lib/firewall.
 The example firewall.config sets the default based on the existence of some
 magic files in /etc. It assumes that the original eth* interfaces have been
 renamed to net* (e.g. by eudev or udev rules).
@@ -54,10 +57,6 @@ system folder and (after systemctl daemon-reload) enable the scripts with
 For openrc (the Gentoo init system) there are some scripts provided in
 the openrc folder. Copy these scripts and their configs to /etc/init.d
 or /etc/conf.d, respectively and edit /etc/conf.d.
-(Note that conf.d/modules conflicts with the original file from openrc.
-Instead of copying, you might want to add the last line of this file
-manually to your configuration: It is responsible for loading kernel
-modules as described below).
 To activate the firewall with openrc, call e.g.
 (the runlevels might depend on your configuration):
 	rc-config add fireclose boot
@@ -74,7 +73,7 @@ For older versions of openrc, you can use the conf.d/modules file to get
 at least some rudimentary support of these directories.
 
 For Gentoo, there is an ebuild in the mv overlay (available by layman)
-which installs all files (but you still have to configure them).
+(but you might still have to configure the firewall.config, see above).
 
 
 Instructions for firewall-scripted.sh:
@@ -87,12 +86,15 @@ then	eval "$SOME_VARIABLE"
 else	echo "firewall-scripted.sh not installed" >&2
 fi
 
-Alternatively you can also source:
+Remark: An obsoleted method was to use instead
 
 . firewall-scripted.sh
 
-but the latter has the disadvantage that your script will just stop if
-firewall-scripted.sh is not available.
+The latter works for older versions of firwall-mv or if one installs manually,
+but unless an appropriate PATH before sourcing is set, it fails when
+firewall-scripted.sh is replaced by a wrapper script which happens with the
+provided Makefile. Moreover, if firwell-scripted.sh is not available it stops
+the script.
 
 All functions and variables used internally by firewall-scripted.sh have the
 form Fwmv[A-Z]* or fwmv_*, respectively, so do not use these.

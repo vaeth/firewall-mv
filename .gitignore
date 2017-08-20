@@ -1,0 +1,4 @@
+/firewall-scripted.sh
+firewall-mv-*.asc
+firewall-mv-*.tar.*
+firewall-mv-*.zip

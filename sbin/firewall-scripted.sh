@@ -6,6 +6,7 @@ FwmvPush() {
 	command -v Push 2>/dev/null || if PushA_=`push.sh 2>/dev/null`
 	then	eval "$PushA_"
 	else	echo "push.sh from https://github.com/vaeth/push (v2.0 or newer) required" >&2
+		exit 1
 	fi
 FwmvPush() {
 	Push "$@"
