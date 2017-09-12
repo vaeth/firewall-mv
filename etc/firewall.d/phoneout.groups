@@ -1,0 +1,2 @@
+# The default firewall.config lets only groups listed here phone outside.
+# If no group is specified, the single group "users" is chosen.
