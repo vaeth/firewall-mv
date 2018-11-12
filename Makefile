@@ -8,7 +8,7 @@ OPENRCDIR=$(ETCDIR)
 MODULESLOADDIR=$(PREFIX)/usr/lib/modules-load.d
 SYSTEMDDIR=$(EPREFIX)/lib/systemd
 SYSTEMUNITDIR=$(SYSTEMDDIR)/system
-ZSH_FPATH=$(PREFIX)/share/zsh/site-functions
+ZSH_FPATH=$(PREFIX)/usr/share/zsh/site-functions
 
 .PHONY: FORCE all install uninstall clean distclean maintainer-clean
 
