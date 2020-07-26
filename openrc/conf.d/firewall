@@ -1,4 +1,6 @@
 # /etc/conf.d/firewall: config file for /etc/init.d/firewall
+# (C) Martin V\"ath <martin at mvath.de>
+# SPDX-License-Identifier: BSD-3-Clause
 
 # Run sysctl.net on start/close/off  (otherwise -k is passed to firewall)
 sysctl_on_start=YES

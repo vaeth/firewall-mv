@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # This script is part of Martin V\"ath's firewall scripts.
-# (C) Martin V\"ath <martin@mvath.de>
+# (C) Martin V\"ath <martin at mvath.de>
+# SPDX-License-Identifier: BSD-3-Clause
 set -u
 Usage() {
 	printf '%s\n' \

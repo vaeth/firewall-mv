@@ -1,6 +1,7 @@
 #!/usr/bin/env cat
 # This script is part of Martin V\"ath's firewall scripts.
-# (C) Martin V\"ath <martin@mvath.de>
+# (C) Martin V\"ath <martin at mvath.de>
+# SPDX-License-Identifier: BSD-3-Clause
 
 FwmvPush() {
 	command -v Push 2>/dev/null || if PushA_=`push.sh 2>/dev/null`

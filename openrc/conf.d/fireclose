@@ -1,4 +1,6 @@
 # /etc/conf.d/fireclose: config file for /etc/init.d/fireclose
+# (C) Martin V\"ath <martin at mvath.de>
+# SPDX-License-Identifier: BSD-3-Clause
 
 # Run sysctl.net (otherwise -k is passed to firewall)
 with_sysctl=YES

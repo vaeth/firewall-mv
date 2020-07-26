@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
 [Unit]
 Description=firewall-mv closes all local firewalls
 DefaultDependencies=no

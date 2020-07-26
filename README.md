@@ -1,8 +1,8 @@
 # firewall-mv
 
-(C) Martin Väth (martin at mvath.de).
-This project is under a BSD type license, meaning that you can do almost
-anything with it except removing my name.
+(C) Martin Väth <martin at mvath.de>
+This project is under the BSD license 2.0 (“3-clause BSD license”).
+SPDX-License-Identifier: BSD-3-Clause
 
 A collection of POSIX shell scripts to initialize iptables and
 net-related sysctl variables of Linux.
